@@ -97,6 +97,8 @@ class Sound:
         return loudness_observed
 
     def observed_sound(self, observer_pos):
+        if self.loudness == 0:
+            return (None, None)
         return (
             self.observed_sound_pos(observer_pos),
             self.observed_sound_loudness(observer_pos),

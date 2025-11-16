@@ -18,9 +18,13 @@ def main():
     game = MarcoPolo(pool_files[int(choice)], num_polos=3)
 
     game.render()
+    i = 1
     while not game.iterate_round():
         game.render()
-        time.sleep(0.1)
+        print(f"Round {i}")
+        i += 1
+        time.sleep(5)
+    game.render()
 
     print("Game over!")
     print("Marco was caught by a polo!")

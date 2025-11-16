@@ -13,7 +13,7 @@ class Seeker(Player):
         """Seeker can move (still, slow, fast) or yell 'seeker'."""
         available_actions = super().get_actions()
 
-        available_actions.append("seeker")
+        available_actions.append("yell")
 
         return available_actions
 
@@ -25,17 +25,20 @@ class Seeker(Player):
             newBeliefGrid = self.beliefGrid
             if action == "yell":
                 newBeliefGrid = self.expected_yelling_belief_grid()
-            
+            else:
+                self.pos = (self.pos[0] + action[0], self.pos[1] + action[1])
                 
             reward = self.get_reward(newBeliefGrid)
             if reward >= best_reward:
                 best_reward = reward
                 best_action = action
+            
+            self.pos = (self.pos[0] - action[0], self.pos[1] - action[1])
 
         return best_action
 
     def expected_yelling_belief_grid(self):
-        k = self.pool.num_hiders
+        k = len(self.game.polos)
 
         coords = []
         weights = []
@@ -58,8 +61,11 @@ class Seeker(Player):
 
         observations = []
         for center in centers:
-            observations.append(self.pool.get_action_sound(center, "yell"))
-        
+            # Simulate the perceived sound at Marco's current position
+            sound = self.pool.get_action_sound(center, "yell")
+            (pos, loudness) = sound.observed_sound(self.pos)
+            observations.append((pos[0], pos[1], loudness))
+            
         newBeliefGrid = self.get_updated_belief_grid(observations)
         return newBeliefGrid
 

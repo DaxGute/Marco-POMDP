@@ -62,7 +62,7 @@ class Pool:
             magnitude = abs(dx) + abs(dy)
 
             if magnitude < 1:
-                loudness = 0.0
+                loudness = 1e-6
             elif magnitude < 2:
                 loudness = 0.5
             else:
