@@ -55,7 +55,7 @@ class Pool:
 
     def get_action_sound(self, pos, action):
         if action == "yell":
-            loudness = 1000
+            loudness = 1e5
         else:
             dx, dy = action
             magnitude = abs(dx) + abs(dy)

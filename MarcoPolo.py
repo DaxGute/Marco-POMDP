@@ -9,9 +9,13 @@ from players.hider import Hider
 
 SYMBOLS = {
     0: "▯",
-    0.25: "░",
-    0.5: "▒",
+    0.125: "░",
+    0.25: "▒",
+    0.375: "▓",
+    0.5: "▓",
+    0.625: "▓",
     0.75: "▓",
+    0.875: "█",
     1: "█",
 }
 
@@ -104,6 +108,9 @@ class MarcoPolo:
 
         self.simulate_marco_action()
 
+        if self.has_won():
+            return True
+
         sounds = []
         for polo in self.polos:
             sounds.append(self.simulate_polo_action(polo))
@@ -111,6 +118,7 @@ class MarcoPolo:
         observations = []
         for sound in sounds:
             (pos, loudness) = sound.observed_sound(self.marco.pos)
+            print(f"Observation: {pos}, {loudness}")
 
             x = max(0, min(pos[0], len(self.pool.grid)-1))
             y = max(0, min(pos[1], len(self.pool.grid[0])-1))
@@ -122,7 +130,7 @@ class MarcoPolo:
 
         self.time += 1
 
-        return self.has_won()
+        return False
 
     def render(self):
         """Render the current game state."""
@@ -155,7 +163,7 @@ class MarcoPolo:
     def display_belief_grid(self, player):
         for row in player.beliefGrid:
             line = "".join(
-                SYMBOLS[round(cell * 4) / 4]
+                SYMBOLS[round(cell * 8) / 8]
                 for cell in row
             )
             print(line)

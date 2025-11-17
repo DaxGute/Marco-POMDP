@@ -8,10 +8,12 @@ class Player:
         self.pos = (x, y)
         self.pool = pool
 
-        self.l1 = 1e7   # certainty (now normalized to [0,1])
-        self.l2 = 1e6   # distance
-        self.l3 = 1e8   # capture
+        self.l1 = 1e5   # certainty (now normalized to [0,1])
+        self.l2 = 1e5   # distance
+        self.l3 = 1e10   # capture
         self.l4 = 1e1   # time
+
+        self.diffusion_rate = 0.85
 
         self.beliefGrid = self.initialize_belief_grid()
 
@@ -74,69 +76,27 @@ class Player:
                 beliefGrid[i][j] /= z
         return beliefGrid
 
+    
     def get_updated_belief_grid(self, observations):
-        current_time = self.game.time
-        
-        print(f"Time {current_time}: Received {len(observations)} observations")
-        print(f"History size before: {len(self.observation_history) if hasattr(self, 'observation_history') else 'NOT INITIALIZED'}")
-        
-        # Add new observations
-        for obs_x, obs_y, obs_loudness in observations:
-            obs_pos = (obs_x, obs_y)
-            self.observation_history.append({
-                'pos': obs_pos,
-                'loudness': obs_loudness,
-                'time': current_time,
-                'weight': 1.0
-            })
-        
-        print(f"History size after adding: {len(self.observation_history)}")
-        
-        # Decay all observations
-        decay_rate = 0.85
-        for obs in self.observation_history:
-            age = current_time - obs['time']
-            obs['weight'] = decay_rate ** age
-        
-        # Remove very old/weak observations
-        self.observation_history = [obs for obs in self.observation_history 
-                                if obs['weight'] > 0.01]
-        
-        print(f"History size after pruning: {len(self.observation_history)}")
-        
-        # Build belief grid from weighted observations
-        H, W = len(self.pool.grid), len(self.pool.grid[0])
-        grid = [[0.0 for _ in range(W)] for _ in range(H)]
-        
-        for obs in self.observation_history:
-            L = get_perceived_likelihood_grid(
-                self.pos, obs['pos'], obs['loudness'], (H, W)
-            )
+        H = len(self.beliefGrid)
+        W = len(self.beliefGrid[0])
+        newBeliefGrid = self.diffuse_belief_grid(self.beliefGrid)
 
-            # In get_updated_belief_grid, add after creating L:
-            print(f"Observation at {obs['pos']} loudness {obs['loudness']:.2f} weight {obs['weight']:.4f}")
-            max_L = max(max(row) for row in L)
-            print(f"  Max likelihood: {max_L:.6f}")
-            for i in range(H):
-                for j in range(W):
-                    grid[i][j] += obs['weight'] * L[i][j]
-        
-        # Normalize
-        grid[self.pos[0]][self.pos[1]] = 0.0
-        Z = sum(sum(row) for row in grid)
-        
-        print(f"Total probability mass before normalization: {Z}")
-        
-        if Z > 0:
-            grid = [[cell/Z for cell in row] for row in grid]
-        else:
-            # Uniform if no information
-            print("WARNING: No probability mass, returning uniform!")
-            grid = [[1.0/(H*W) if self.pool.grid[i][j] == 0 else 0.0 
-                    for j in range(W)] for i in range(H)]
-            grid[self.pos[0]][self.pos[1]] = 0.0
-        
-        return grid
+        if observations:
+            for (px, py, loudness) in observations:
+                L = get_perceived_likelihood_grid(
+                    observer_pos=self.pos,
+                    perceived_pos=(px, py),
+                    perceived_loudness=loudness,
+                    grid_shape=(H, W),
+                )
+                for i in range(H):
+                    for j in range(W):
+                        newBeliefGrid[i][j] = max(newBeliefGrid[i][j], L[i][j])
+                        if self.pool.grid[i][j] == 1:
+                            newBeliefGrid[i][j] = 0
+
+        return self.normalize_belief_grid(newBeliefGrid)
 
     def get_actions(self):
         """Return all available movement actions (still, slow, fast)."""
@@ -155,49 +115,26 @@ class Player:
 
         return available_actions
 
-    def diffuse_belief(self, grid, steps=1):
-        H, W = len(grid), len(grid[0])
-        
-        # Amount of diffusion per step (tune this based on polo speed)
-        diffusion_per_step = 0.15  # 15% spreads to neighbors each turn
-        
-        current_grid = [row[:] for row in grid]  # Copy
-        
-        for _ in range(min(steps, 5)):  # Cap diffusion steps to avoid over-spreading
-            new_grid = [[0.0 for _ in range(W)] for _ in range(H)]
-            
-            for i in range(H):
-                for j in range(W):
-                    if self.pool.grid[i][j] == 1:  # Wall - no probability here
-                        continue
-                    
-                    prob = current_grid[i][j]
-                    if prob <= 0:
-                        continue
-                    
-                    # Keep some probability at current cell
-                    keep_amount = 1.0 - diffusion_per_step
-                    new_grid[i][j] += prob * keep_amount
-                    
-                    # Spread remaining probability to valid neighbors
-                    neighbors = []
-                    for di in [-1, 0, 1]:
-                        for dj in [-1, 0, 1]:
-                            if di == 0 and dj == 0:
-                                continue
-                            ni, nj = i + di, j + dj
-                            # Check bounds and not a wall
-                            if (0 <= ni < H and 0 <= nj < W and 
-                                self.pool.grid[ni][nj] != 1):
-                                neighbors.append((ni, nj))
-                    
-                    if neighbors:
-                        spread_per_neighbor = (prob * diffusion_per_step) / len(neighbors)
-                        for ni, nj in neighbors:
-                            new_grid[ni][nj] += spread_per_neighbor
-            
-            current_grid = new_grid
-        
-        return current_grid
+    def diffuse_belief_grid(self, beliefGrid):
+        H = len(beliefGrid)
+        W = len(beliefGrid[0])
+        newBeliefGrid = [row[:] for row in beliefGrid]
 
+        for i in range(1, H - 1):
+            for j in range(1, W - 1):
+                newBeliefGrid[i][j] = 0
+                totalNeighbors = 0
+                totalProbability = 0
+                for dx in (-1, 0, 1):
+                    for dy in (-1, 0, 1):
+                        if self.pool.in_bounds(i + dx, j + dy):
+                            totalNeighbors += 1
+                            totalProbability += beliefGrid[i + dx][j + dy]
 
+                if totalNeighbors > 0:
+                    newBeliefGrid[i][j] = totalProbability / totalNeighbors
+                else:
+                    newBeliefGrid[i][j] = 0
+
+        return self.normalize_belief_grid(newBeliefGrid)
+                
