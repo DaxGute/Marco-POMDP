@@ -15,15 +15,18 @@ def main():
 
     choice = input("\nEnter the number of the pool you want to load: ").strip()
 
-    game = MarcoPolo(pool_files[int(choice)], num_polos=3)
+    game = MarcoPolo(pool_files[int(choice)], num_polos=3, diagnostics=[True, True, False, False])
 
     game.render()
-    i = 1
+
     while not game.iterate_round():
         game.render()
-        print(f"Round {i}")
+        
+        game.display_diagnostics()
+
         i += 1
-        time.sleep(5)
+
+        input("Press Enter to continue...")
     game.render()
 
     print("Game over!")

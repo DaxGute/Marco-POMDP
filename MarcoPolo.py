@@ -1,24 +1,36 @@
 import math
 import random
+from tarfile import LinkFallbackError
 
 from physics.pool import Pool
 from physics.sound import Sound
 from players.seeker import Seeker
 from players.hider import Hider
 
+SYMBOLS = {
+    0: "▯",
+    0.25: "░",
+    0.5: "▒",
+    0.75: "▓",
+    1: "█",
+}
 
 class MarcoPolo:
     """
     Game orchestrator: owns players, runs rounds, and uses physics primitives.
     """
 
-    def __init__(self, pool_name: str, num_polos: int):
+    def __init__(self, pool_name, num_polos, diagnostics = False):
         self.pool = Pool(pool_name)
         self.num_polos = num_polos
+        self.time = 0
 
         self.init_players()
 
-        self.last_round_yell = False
+        self.round_yell = False
+
+        if diagnostics != False:
+            self.diagnostics = diagnostics
 
     def init_players(self):
         available_positions = []
@@ -45,6 +57,44 @@ class MarcoPolo:
                 return True
         return False
 
+    def simulate_polo_action(self, polo):
+        sound = None
+
+        dist = math.hypot(polo.pos[0] - self.marco.pos[0], polo.pos[1] - self.marco.pos[1])
+
+        if self.round_yell and dist >= 2:
+            sound = self.pool.get_action_sound(polo.pos, "yell")
+        else:
+            (dx, dy) = polo.choose_action()
+            polo.pos = (polo.pos[0] + dx, polo.pos[1] + dy)
+            sound = self.pool.get_action_sound(polo.pos, (dx, dy))
+
+        loudness = sound.observed_sound_loudness(self.marco.pos)
+        polo.beliefGrid = polo.get_updated_belief_grid([(sound.pos[0], sound.pos[1], loudness)])
+        
+        return sound
+
+    def simulate_marco_action(self):
+        action = self.marco.choose_action()
+        print(f"Marco chose action: {action}")
+        print(f"Marco current pos: {self.marco.pos}")
+        
+        if action == "yell":
+            self.round_yell = True
+        else:
+            (dx, dy) = action
+            new_x = self.marco.pos[0] + dx
+            new_y = self.marco.pos[1] + dy
+            
+            print(f"New position would be: ({new_x}, {new_y})")
+            print(f"in_bounds check: {self.pool.in_bounds(new_x, new_y)}")
+            
+            if self.pool.in_bounds(new_x, new_y):
+                self.marco.pos = (new_x, new_y)
+                print(f"Moved to: {self.marco.pos}")
+            else:
+                print("Move blocked!")
+
     def iterate_round(self):
         """
         Advance the game by one round.
@@ -52,43 +102,61 @@ class MarcoPolo:
         """
         self.pool.time += 1
 
+        self.simulate_marco_action()
+
         sounds = []
         for polo in self.polos:
-            sound = None
-
-            dist = math.hypot(polo.pos[0] - self.marco.pos[0], polo.pos[1] - self.marco.pos[1])
-
-            if not self.last_round_yell or dist < 2:
-                (dx, dy) = polo.choose_action()
-                polo.pos = (polo.pos[0] + dx, polo.pos[1] + dy)
-                sound = self.pool.get_action_sound(polo.pos, (dx, dy))
-            else:
-                sound = self.pool.get_action_sound(polo.pos, "yell")
-
-            loudness = sound.observed_sound_loudness(self.marco.pos)
-            polo.beliefGrid = polo.get_updated_belief_grid([(sound.pos[0], sound.pos[1], loudness)])
-            sounds.append(sound)
-
-        self.last_round_yell = False
+            sounds.append(self.simulate_polo_action(polo))
 
         observations = []
         for sound in sounds:
             (pos, loudness) = sound.observed_sound(self.marco.pos)
-            observations.append((pos[0], pos[1], loudness))
+
+            x = max(0, min(pos[0], len(self.pool.grid)-1))
+            y = max(0, min(pos[1], len(self.pool.grid[0])-1))
+
+            observations.append((x, y, loudness))
         self.marco.beliefGrid = self.marco.get_updated_belief_grid(observations)
 
-        action = self.marco.choose_action()
-        if action == "yell":
-            self.last_round_yell = True
-        else:
-            (dx, dy) = action
-            self.marco.pos = (self.marco.pos[0] + dx, self.marco.pos[1] + dy)
+        self.round_yell = False
 
-        for polo in self.polos:
-            if polo.pos == self.marco.pos:
-                return True
-        return False
+        self.time += 1
+
+        return self.has_won()
 
     def render(self):
         """Render the current game state."""
         self.pool.render(self.marco, self.polos)
+    
+    def display_diagnostics(self):
+
+        print(f"Time: {self.time}")
+        if self.diagnostics[0]:
+            
+            marco_action_rewards = [(reward, action) for action, reward in self.marco.lastActionRewardPairs.items()]
+            marco_action_rewards.sort(key=lambda x: x[0], reverse=True)
+            
+            print("Marco Best Action: " + str(marco_action_rewards[0][1]) + " with reward: " + str(marco_action_rewards[0][0]))
+            print("Marco Second Best Action: " + str(marco_action_rewards[1][1]) + " with reward: " + str(marco_action_rewards[1][0]))
+        
+        for i in range(1, len(self.diagnostics)):
+            if self.diagnostics[i]:
+                if len(self.polos[i].lastActionRewardPairs.items()) > 0:
+                    polo_action_rewards = [(reward, action) for action, reward in self.polos[i].lastActionRewardPairs.items()]
+                    polo_action_rewards.sort(key=lambda x: x[0], reverse=True)
+
+                    print(f"Polo {i} Best Action: {polo_action_rewards[0][1]} with reward: {polo_action_rewards[0][0]}")
+                    print(f"Polo {i} Second Best Action: {polo_action_rewards[1][1]} with reward: {polo_action_rewards[1][0]}")
+                else:
+                    print(f"Polo {i} has no actions")
+
+        self.display_belief_grid(self.marco)
+
+    def display_belief_grid(self, player):
+        for row in player.beliefGrid:
+            line = "".join(
+                SYMBOLS[round(cell * 4) / 4]
+                for cell in row
+            )
+            print(line)
+            

@@ -35,7 +35,7 @@ class Pool:
     def in_bounds(self, x: int, y: int) -> bool:
         if x < 0 or x >= len(self.grid) or y < 0 or y >= len(self.grid[0]):
             return False
-        return self.grid[x][y] != 1
+        return self.baseGrid[x][y] != 1
 
     def update_grid(self, marco, polos):
         """Overlay player positions onto a copy of the base grid."""
@@ -48,25 +48,24 @@ class Pool:
         """Render the pool with the given players."""
         self.update_grid(marco, polos)
 
-        print("\033[2J\033[H", end="")
+        #print("\033[2J\033[H", end="")
         for row in self.grid:
             print("".join(SYMBOLS.get(cell, "?") for cell in row))
         print("\n")
 
     def get_action_sound(self, pos, action):
         if action == "yell":
-            loudness = 5.0
+            loudness = 1000
         else:
-            # Movement action (dx, dy)
             dx, dy = action
             magnitude = abs(dx) + abs(dy)
 
             if magnitude < 1:
                 loudness = 1e-6
             elif magnitude < 2:
-                loudness = 0.5
+                loudness = 1e2
             else:
-                loudness = 1.0
+                loudness = 1e3
 
         return Sound(pos, loudness)
 

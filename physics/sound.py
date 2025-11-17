@@ -7,38 +7,41 @@ SIGMA_R_SCALE: float = 3.0   # radial uncertainty
 SIGMA_T_SCALE: float = 1.0   # tangential uncertainty 
 
 def get_perceived_likelihood_grid(observer_pos, perceived_pos, perceived_loudness, grid_shape):
-   
     ox, oy = observer_pos
     px, py = perceived_pos
     H, W = grid_shape
-
-    vx = px - ox
-    vy = py - oy
+    
+    vx = ox - px
+    vy = oy - py
     dist = max(math.hypot(vx, vy), 1e-6)
-
+    
     u_r = (vx / dist, vy / dist)
     u_t = (-u_r[1], u_r[0])
-
-    # Uncertainty scale: bigger if farther, smaller if louder
-    source_loudness = max(perceived_loudness, 1e-6)
+    
+    # Reconstruct source loudness
+    source_loudness = perceived_loudness * (dist * dist)
+    source_loudness = max(source_loudness, 1e-6)
+    
     scale = dist / math.sqrt(source_loudness)
-
     sigma_r = max(SIGMA_R_SCALE * scale, 1e-6)
     sigma_t = max(SIGMA_T_SCALE * scale, 1e-6)
-
-    likelihood_grid = [[0.0 for _ in range(grid_shape[1])] for _ in range(grid_shape[0])]
-
-    for i in range(grid_shape[0]):
-        for j in range(grid_shape[1]):
+    
+    # Normalizing constant for 2D Gaussian
+    norm_const = 1.0 / (2 * math.pi * sigma_r * sigma_t)
+    
+    likelihood_grid = [[0.0 for _ in range(W)] for _ in range(H)]
+    
+    for i in range(H):
+        for j in range(W):
             dx = i - px  
             dy = j - py  
-
             r = dx * u_r[0] + dy * u_r[1]
             t = dx * u_t[0] + dy * u_t[1]
-
-            likelihood = math.exp(-0.5 * (r**2 / sigma_r**2 + t**2 / sigma_t**2))
+            
+            # Properly normalized Gaussian likelihood
+            likelihood = norm_const * math.exp(-0.5 * (r**2 / sigma_r**2 + t**2 / sigma_t**2))
             likelihood_grid[i][j] = likelihood
-
+    
     return likelihood_grid
 
 
@@ -78,8 +81,8 @@ class Sound:
         x_offset = r_coord * unit_r[0] + t_coord * unit_t[0]
         y_offset = r_coord * unit_r[1] + t_coord * unit_t[1]
 
-        x_obv = round(ox + x_offset)
-        y_obv = round(oy + y_offset)
+        x_obv = round(sx + x_offset)
+        y_obv = round(sy + y_offset)
 
         return (x_obv, y_obv)
 
