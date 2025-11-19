@@ -11,6 +11,11 @@ class Seeker(Player):
     def __init__(self, x: int, y: int, pool: Pool):
         super().__init__(x, y, pool)
 
+        self.l1 = 1e4   # certainty (now normalized to [0,1])
+        self.l2 = 1e2   # distance
+        self.l3 = 1e3   # capture
+        self.l4 = 1e1   # time
+
 
     def get_actions(self):
         """Seeker can move (still, slow, fast) or yell 'seeker'."""
@@ -47,6 +52,32 @@ class Seeker(Player):
                 best_action = action
 
         return best_action
+
+    def get_reward(self, beliefGrid, seekerPos):
+        certaintyReward = 0
+        distanceReward = 0
+        capturedReward = 0
+        timeReward = -self.game.time
+
+        for i in range(len(beliefGrid)):
+            for j in range(len(beliefGrid[0])):
+                if beliefGrid[i][j] > 0:
+                    certaintyReward += beliefGrid[i][j] ** 2
+
+                    distance = math.sqrt((i - seekerPos[0]) ** 2 + (j - seekerPos[1]) ** 2)
+                    if distance < 1:
+                        capturedReward += beliefGrid[i][j]
+                    else:
+                        distanceReward += beliefGrid[i][j] * (1 / distance)
+
+        compositeReward = (
+            self.l1 * certaintyReward
+            + self.l2 * distanceReward
+            + self.l3 * capturedReward
+            + self.l4 * timeReward
+        )
+
+        return compositeReward
 
     def expected_yelling_belief_grid(self):
         k = len(self.game.polos)

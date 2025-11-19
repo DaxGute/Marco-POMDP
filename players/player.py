@@ -3,21 +3,14 @@ from physics.pool import Pool
 from physics.sound import Sound, get_perceived_likelihood_grid
 
 
+
 class Player:
     def __init__(self, x: int, y: int, pool: Pool):
         self.pos = (x, y)
         self.pool = pool
 
-        self.l1 = 1e5   # certainty (now normalized to [0,1])
-        self.l2 = 1e5   # distance
-        self.l3 = 1e10   # capture
-        self.l4 = 1e1   # time
-
-        self.diffusion_rate = 0.85
 
         self.beliefGrid = self.initialize_belief_grid()
-
-        self.observation_history = []
 
         self.lastActionRewardPairs = {}
 
@@ -25,7 +18,7 @@ class Player:
         totalWaterCells = 0
         for i, row in enumerate(self.pool.grid):
             for j, cell in enumerate(row):
-                if cell == 0 and (i, j) != (self.pos[0], self.pos[1]):
+                if cell == 0 and (i, j):
                     totalWaterCells += 1
 
         beliefPrior = 1 / totalWaterCells 
@@ -34,37 +27,11 @@ class Player:
         for i in range(len(self.pool.grid)):
             beliefGrid.append([])
             for j in range(len(self.pool.grid[0])):
-                if self.pool.grid[i][j] == 0 and (i, j) != (self.pos[0], self.pos[1]):
+                if self.pool.grid[i][j] == 0:
                     beliefGrid[i].append(beliefPrior)
                 else:
                     beliefGrid[i].append(0)
         return beliefGrid
-
-    def get_reward(self, beliefGrid, seekerPos):
-        certaintyReward = 0
-        distanceReward = 0
-        capturedReward = 0
-        timeReward = -self.game.time
-
-        for i in range(len(beliefGrid)):
-            for j in range(len(beliefGrid[0])):
-                if beliefGrid[i][j] > 0:
-                    certaintyReward += beliefGrid[i][j] * math.log(beliefGrid[i][j])
-
-                    distance = math.sqrt((i - seekerPos[0]) ** 2 + (j - seekerPos[1]) ** 2)
-                    if distance < 1:
-                        capturedReward += beliefGrid[i][j]
-                    else:
-                        distanceReward += beliefGrid[i][j] * (1 / distance)
-
-        compositeReward = (
-            self.l1 * certaintyReward
-            + self.l2 * distanceReward
-            + self.l3 * capturedReward
-            + self.l4 * timeReward
-        )
-
-        return compositeReward
 
     def normalize_belief_grid(self, beliefGrid):
         z = 0
@@ -82,19 +49,32 @@ class Player:
         W = len(self.beliefGrid[0])
         newBeliefGrid = self.diffuse_belief_grid(self.beliefGrid)
 
+        
         if observations:
+
+            L_total = [[0.0 for _ in range(W)] for _ in range(H)]
             for (px, py, loudness) in observations:
+                if loudness < 0.001:
+                    continue
                 L = get_perceived_likelihood_grid(
-                    observer_pos=self.pos,
+                    observer_pos=(self.game.marco.pos[0], self.game.marco.pos[1]),
                     perceived_pos=(px, py),
                     perceived_loudness=loudness,
                     grid_shape=(H, W),
                 )
                 for i in range(H):
                     for j in range(W):
-                        newBeliefGrid[i][j] = max(newBeliefGrid[i][j], L[i][j])
-                        if self.pool.grid[i][j] == 1:
-                            newBeliefGrid[i][j] = 0
+                        L_total[i][j] += L[i][j]
+
+
+            alpha = 0.4
+
+            for i in range(H):
+                for j in range(W):
+                    if self.pool.grid[i][j] == 1:
+                        newBeliefGrid[i][j] = 0
+                    else:
+                        newBeliefGrid[i][j] = alpha * L_total[i][j] + (1 - alpha) * newBeliefGrid[i][j]
 
         return self.normalize_belief_grid(newBeliefGrid)
 

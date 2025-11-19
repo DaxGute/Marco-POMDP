@@ -23,7 +23,7 @@ class Pool:
         self.baseGrid = self.load_pool_csv(f"{POOLS_DIR}/{pool_name}")
         self.grid = copy.deepcopy(self.baseGrid)
         self.time = 0
-
+        
     def load_pool_csv(self, path):
         grid = []
         with open(path, newline="") as f:
@@ -55,7 +55,7 @@ class Pool:
 
     def get_action_sound(self, pos, action):
         if action == "yell":
-            loudness = 1e5
+            loudness = 1e4
         else:
             dx, dy = action
             magnitude = abs(dx) + abs(dy)
@@ -63,9 +63,9 @@ class Pool:
             if magnitude < 1:
                 loudness = 1e-6
             elif magnitude < 2:
-                loudness = 1e2
+                loudness = 10
             else:
-                loudness = 1e3
+                loudness = 100
 
         return Sound(pos, loudness)
 

@@ -1,6 +1,5 @@
 import math
 import random
-from tarfile import LinkFallbackError
 
 from physics.pool import Pool
 from physics.sound import Sound
@@ -9,20 +8,13 @@ from players.hider import Hider
 
 SYMBOLS = {
     0: "▯",
-    0.125: "░",
-    0.25: "▒",
-    0.375: "▓",
-    0.5: "▓",
-    0.625: "▓",
+    0.25: "░",
+    0.5: "▒",
     0.75: "▓",
-    0.875: "█",
     1: "█",
 }
 
 class MarcoPolo:
-    """
-    Game orchestrator: owns players, runs rounds, and uses physics primitives.
-    """
 
     def __init__(self, pool_name, num_polos, diagnostics = False):
         self.pool = Pool(pool_name)
@@ -80,8 +72,6 @@ class MarcoPolo:
 
     def simulate_marco_action(self):
         action = self.marco.choose_action()
-        print(f"Marco chose action: {action}")
-        print(f"Marco current pos: {self.marco.pos}")
         
         if action == "yell":
             self.round_yell = True
@@ -90,20 +80,10 @@ class MarcoPolo:
             new_x = self.marco.pos[0] + dx
             new_y = self.marco.pos[1] + dy
             
-            print(f"New position would be: ({new_x}, {new_y})")
-            print(f"in_bounds check: {self.pool.in_bounds(new_x, new_y)}")
-            
-            if self.pool.in_bounds(new_x, new_y):
-                self.marco.pos = (new_x, new_y)
-                print(f"Moved to: {self.marco.pos}")
-            else:
-                print("Move blocked!")
+            self.marco.pos = (new_x, new_y)
+          
 
     def iterate_round(self):
-        """
-        Advance the game by one round.
-        Returns True if Marco catches a polo, False otherwise.
-        """
         self.pool.time += 1
 
         self.simulate_marco_action()
@@ -111,19 +91,21 @@ class MarcoPolo:
         if self.has_won():
             return True
 
-        sounds = []
-        for polo in self.polos:
-            sounds.append(self.simulate_polo_action(polo))
-
         observations = []
-        for sound in sounds:
+        for polo in self.polos:
+            sound = self.simulate_polo_action(polo)
+
+            observation = [(sound.pos[0], sound.pos[1], sound.observed_sound_loudness(self.marco.pos))]
+            polo.beliefGrid = polo.get_updated_belief_grid(observation)
+
             (pos, loudness) = sound.observed_sound(self.marco.pos)
-            print(f"Observation: {pos}, {loudness}")
 
             x = max(0, min(pos[0], len(self.pool.grid)-1))
             y = max(0, min(pos[1], len(self.pool.grid[0])-1))
 
             observations.append((x, y, loudness))
+
+            
         self.marco.beliefGrid = self.marco.get_updated_belief_grid(observations)
 
         self.round_yell = False
@@ -146,25 +128,50 @@ class MarcoPolo:
             
             print("Marco Best Action: " + str(marco_action_rewards[0][1]) + " with reward: " + str(marco_action_rewards[0][0]))
             print("Marco Second Best Action: " + str(marco_action_rewards[1][1]) + " with reward: " + str(marco_action_rewards[1][0]))
+            print(marco_action_rewards)
         
-        for i in range(1, len(self.diagnostics)):
-            if self.diagnostics[i]:
-                if len(self.polos[i].lastActionRewardPairs.items()) > 0:
-                    polo_action_rewards = [(reward, action) for action, reward in self.polos[i].lastActionRewardPairs.items()]
-                    polo_action_rewards.sort(key=lambda x: x[0], reverse=True)
+        # for i in range(1, len(self.diagnostics)):
+        #     if self.diagnostics[i]:
+        #         if len(self.polos[i].lastActionRewardPairs.items()) > 0:
+        #             polo_action_rewards = [(reward, action) for action, reward in self.polos[i].lastActionRewardPairs.items()]
+        #             polo_action_rewards.sort(key=lambda x: x[0], reverse=True)
 
-                    print(f"Polo {i} Best Action: {polo_action_rewards[0][1]} with reward: {polo_action_rewards[0][0]}")
-                    print(f"Polo {i} Second Best Action: {polo_action_rewards[1][1]} with reward: {polo_action_rewards[1][0]}")
-                else:
-                    print(f"Polo {i} has no actions")
+        #             print(f"Polo {i} Best Action: {polo_action_rewards[0][1]} with reward: {polo_action_rewards[0][0]}")
+        #             print(f"Polo {i} Second Best Action: {polo_action_rewards[1][1]} with reward: {polo_action_rewards[1][0]}")
+        #         else:
+        #             print(f"Polo {i} has no actions")
 
-        self.display_belief_grid(self.marco)
+        print("Marco's belief grid:")
+        self.display_belief_grid(self.marco.beliefGrid)
 
-    def display_belief_grid(self, player):
-        for row in player.beliefGrid:
-            line = "".join(
-                SYMBOLS[round(cell * 8) / 8]
-                for cell in row
-            )
+        closest_polo = None
+        closest_distance = float('inf')
+        for polo in self.polos:
+            distance = math.hypot(polo.pos[0] - self.marco.pos[0], polo.pos[1] - self.marco.pos[1])
+            if distance < closest_distance:
+                closest_distance = distance
+                closest_polo = polo
+        print(f"Closest polo: {closest_polo.pos} with distance: {closest_distance}")
+        self.display_belief_grid(closest_polo.beliefGrid)
+
+
+    def display_belief_grid(self, beliefGrid):
+        grid = beliefGrid
+    
+        eps = 1e-12
+
+        logs = [[math.log(max(cell, eps)) for cell in row] for row in grid]
+
+        min_log = min(min(row) for row in logs)
+        max_log = max(max(row) for row in logs)
+        span = max_log - min_log
+
+        for row in logs:
+            line = ""
+            for v in row:
+                z = (v - min_log) / span
+                
+                level = round(z * 4) / 4
+                line += SYMBOLS[level]
             print(line)
             
