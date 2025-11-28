@@ -120,8 +120,9 @@ class Seeker(Player):
             dist = math.hypot(center[0] - self.pos[0], center[1] - self.pos[1])
             
             if dist < 2:
-                continue
-            sound = self.pool.get_action_sound(center, "yell")
+                sound = self.pool.get_action_sound(center, (0, 0))
+            else:
+                sound = self.pool.get_action_sound(center, "yell")
             loudness = sound.observed_sound_loudness(self.pos)
 
             observations.append((center[0], center[1], loudness))

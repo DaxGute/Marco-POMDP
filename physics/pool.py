@@ -1,6 +1,6 @@
 import copy
 import csv
-
+import math
 from physics.sound import Sound, get_actual_sound_likelihood
 
 POOLS_DIR = "pools"
@@ -85,9 +85,25 @@ class Pool:
         return Sound(pos, SOUND_ACTIONS[action])
 
     def get_perceived_sound_actions_liklihoods(self, loudness):
-        actions_liklihoods = {}
+        actions_log_liklihoods = {}
+    
         for action in SOUND_ACTIONS:
             likelihood = get_actual_sound_likelihood(SOUND_ACTIONS[action], loudness)
-            actions_liklihoods[action] = likelihood
-
+            actions_log_liklihoods[action] = math.log(max(likelihood, 1e-300))
+        
+        # Log-sum-exp trick for normalization
+        max_log = max(actions_log_liklihoods.values())
+        
+        actions_liklihoods = {}
+        total = 0.0
+        
+        for action in actions_log_liklihoods:
+            prob = math.exp(actions_log_liklihoods[action] - max_log)
+            actions_liklihoods[action] = prob
+            total += prob
+        
+        # Normalize
+        for action in actions_liklihoods:
+            actions_liklihoods[action] /= total
+        
         return actions_liklihoods

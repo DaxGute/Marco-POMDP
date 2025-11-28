@@ -127,13 +127,13 @@ class MarcoPolo:
         H = len(self.marco.beliefGrids[0])
         W = len(self.marco.beliefGrids[0][0])
         
-        # for i in range(H):
-        #     row = []
-        #     for j in range(W):
-        #         max_likelihood = max(beliefGrid[i][j] for beliefGrid in self.marco.beliefGrids)
-        #         row.append(max_likelihood)
-        #     combinedBeliefGrid.append(row)
-        # self.display_belief_grid(combinedBeliefGrid)
+        for i in range(H):
+            row = []
+            for j in range(W):
+                max_likelihood = max(beliefGrid[i][j] for beliefGrid in self.marco.beliefGrids)
+                row.append(max_likelihood)
+            combinedBeliefGrid.append(row)
+        self.display_belief_grid(combinedBeliefGrid)
         self.display_action_rewards(self.marco)
         
         print("\nClosest Polo:")

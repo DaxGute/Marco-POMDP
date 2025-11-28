@@ -10,9 +10,9 @@ class Player:
         self.pos = (x, y)
         self.pool = pool
         
-        self.l1 = 1e4   # certainty (now normalized to [0,1])
+        self.l1 = 1e2   # certainty (now normalized to [0,1])
         self.l2 = 1e2   # distance
-        self.l3 = 1e3   # capture
+        self.l3 = 1e8   # capture
         self.l4 = 1e1   # time
 
         self.lastActionRewardPairs = {}
@@ -43,6 +43,10 @@ class Player:
         for i in range(len(beliefGrid)):
             for j in range(len(beliefGrid[0])):
                 z += beliefGrid[i][j]
+
+        # if z < 1e-10:
+        #     return self.initialize_belief_grid()
+
         for i in range(len(beliefGrid)):
             for j in range(len(beliefGrid[0])):
                 beliefGrid[i][j] /= z
@@ -100,8 +104,6 @@ class Player:
         newBeliefGrid = self.get_diffused_prior_belief_grid(beliefGrid, observation[2])
 
         (px, py, loudness) = observation
-        if loudness < 0.001:
-            return newBeliefGrid
 
         L = get_perceived_likelihood_grid(
             (self.game.marco.pos[0], self.game.marco.pos[1]), # observer position
@@ -119,17 +121,24 @@ class Player:
 
     def get_diffused_prior_belief_grid(self, beliefGrid, loudness):
         actions_liklihoods = self.pool.get_perceived_sound_actions_liklihoods(loudness)
-        newBeliefGrid = copy.deepcopy(beliefGrid)
+        newBeliefGrid = [[0.0 for _ in row] for row in beliefGrid]
 
         for i in range(len(newBeliefGrid)):
             for j in range(len(newBeliefGrid[0])):
+
+                if beliefGrid[i][j] == 0:
+                    continue
+                
                 for action in actions_liklihoods:
+
                     if action == "yell":
-                        continue
-                    dx, dy = action
-                    new_x = i - dx
-                    new_y = j - dy
+                        dx, dy = 0, 0
+                    else:   
+                        dx, dy = action
+
+                    new_x = i + dx
+                    new_y = j + dy
                     if self.pool.in_bounds(new_x, new_y):
-                        newBeliefGrid[i][j] += actions_liklihoods[action] * beliefGrid[new_x][new_y]
+                        newBeliefGrid[new_x][new_y] += actions_liklihoods[action] * beliefGrid[i][j]
 
         return self.normalize_belief_grid(newBeliefGrid)
