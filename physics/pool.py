@@ -1,7 +1,7 @@
 import copy
 import csv
 
-from physics.sound import Sound
+from physics.sound import Sound, get_actual_sound_likelihood
 
 POOLS_DIR = "pools"
 
@@ -12,6 +12,34 @@ SYMBOLS = {
     3: "●",  # Marco
 }
 
+SOUND_ACTIONS = {
+    (0, 0): 1e-6,
+    (-1, 0): 10,
+    (1, 0): 10,
+    (0, -1): 10,
+    (0, 1): 10,
+    (-1, -1): 20,
+    (-1, 1): 20,
+    (1, -1): 20,
+    (1, 1): 20,
+    (2, 0): 50,
+    (0, 2): 50,
+    (-2, 0): 50,
+    (0, -2): 50,
+    (-2,-1): 70,
+    (-2,1): 100,
+    (2,-1): 100,
+    (2,1): 100,
+    (1,-2): 100,
+    (1,2): 100,
+    (-1,-2): 100,
+    (-1,2): 100,
+    (-2, -2): 150,
+    (-2, 2): 150,
+    (2, -2): 150,
+    (2, 2): 150,
+    "yell": 1e4,
+}
 
 class Pool:
     """
@@ -54,19 +82,12 @@ class Pool:
         print("\n")
 
     def get_action_sound(self, pos, action):
-        if action == "yell":
-            loudness = 1e4
-        else:
-            dx, dy = action
-            magnitude = abs(dx) + abs(dy)
+        return Sound(pos, SOUND_ACTIONS[action])
 
-            if magnitude < 1:
-                loudness = 1e-6
-            elif magnitude < 2:
-                loudness = 10
-            else:
-                loudness = 100
+    def get_perceived_sound_actions_liklihoods(self, loudness):
+        actions_liklihoods = {}
+        for action in SOUND_ACTIONS:
+            likelihood = get_actual_sound_likelihood(SOUND_ACTIONS[action], loudness)
+            actions_liklihoods[action] = likelihood
 
-        return Sound(pos, loudness)
-
-
+        return actions_liklihoods

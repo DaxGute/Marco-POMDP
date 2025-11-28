@@ -1,3 +1,4 @@
+import copy
 import math
 from physics.pool import Pool
 from physics.sound import Sound, get_perceived_likelihood_grid
@@ -8,11 +9,14 @@ class Player:
     def __init__(self, x: int, y: int, pool: Pool):
         self.pos = (x, y)
         self.pool = pool
-
-
-        self.beliefGrid = self.initialize_belief_grid()
+        
+        self.l1 = 1e4   # certainty (now normalized to [0,1])
+        self.l2 = 1e2   # distance
+        self.l3 = 1e3   # capture
+        self.l4 = 1e1   # time
 
         self.lastActionRewardPairs = {}
+
 
     def initialize_belief_grid(self):
         totalWaterCells = 0
@@ -33,6 +37,7 @@ class Player:
                     beliefGrid[i].append(0)
         return beliefGrid
 
+
     def normalize_belief_grid(self, beliefGrid):
         z = 0
         for i in range(len(beliefGrid)):
@@ -43,40 +48,33 @@ class Player:
                 beliefGrid[i][j] /= z
         return beliefGrid
 
-    
-    def get_updated_belief_grid(self, observations):
-        H = len(self.beliefGrid)
-        W = len(self.beliefGrid[0])
-        newBeliefGrid = self.diffuse_belief_grid(self.beliefGrid)
 
-        
-        if observations:
+    def get_reward(self, beliefGrid, seekerPos):
+        certaintyReward = 0
+        distanceReward = 0
+        capturedReward = 0
+        timeReward = -self.game.time
 
-            L_total = [[0.0 for _ in range(W)] for _ in range(H)]
-            for (px, py, loudness) in observations:
-                if loudness < 0.001:
-                    continue
-                L = get_perceived_likelihood_grid(
-                    observer_pos=(self.game.marco.pos[0], self.game.marco.pos[1]),
-                    perceived_pos=(px, py),
-                    perceived_loudness=loudness,
-                    grid_shape=(H, W),
-                )
-                for i in range(H):
-                    for j in range(W):
-                        L_total[i][j] += L[i][j]
+        for i in range(len(beliefGrid)):
+            for j in range(len(beliefGrid[0])):
+                if beliefGrid[i][j] > 0:
+                    certaintyReward += beliefGrid[i][j] ** 2
 
-
-            alpha = 0.4
-
-            for i in range(H):
-                for j in range(W):
-                    if self.pool.grid[i][j] == 1:
-                        newBeliefGrid[i][j] = 0
+                    distance = math.sqrt((i - seekerPos[0]) ** 2 + (j - seekerPos[1]) ** 2)
+                    if distance < 1:
+                        capturedReward += beliefGrid[i][j]
                     else:
-                        newBeliefGrid[i][j] = alpha * L_total[i][j] + (1 - alpha) * newBeliefGrid[i][j]
+                        distanceReward += beliefGrid[i][j] * (1 / distance)
 
-        return self.normalize_belief_grid(newBeliefGrid)
+        compositeReward = (
+            self.l1 * certaintyReward
+            + self.l2 * distanceReward
+            + self.l3 * capturedReward
+            + self.l4 * timeReward
+        )
+
+        return compositeReward
+
 
     def get_actions(self):
         """Return all available movement actions (still, slow, fast)."""
@@ -95,26 +93,43 @@ class Player:
 
         return available_actions
 
-    def diffuse_belief_grid(self, beliefGrid):
+    
+    def get_updated_belief_grid(self, beliefGrid, observation):
         H = len(beliefGrid)
         W = len(beliefGrid[0])
-        newBeliefGrid = [row[:] for row in beliefGrid]
+        newBeliefGrid = self.get_diffused_prior_belief_grid(beliefGrid, observation[2])
 
-        for i in range(1, H - 1):
-            for j in range(1, W - 1):
-                newBeliefGrid[i][j] = 0
-                totalNeighbors = 0
-                totalProbability = 0
-                for dx in (-1, 0, 1):
-                    for dy in (-1, 0, 1):
-                        if self.pool.in_bounds(i + dx, j + dy):
-                            totalNeighbors += 1
-                            totalProbability += beliefGrid[i + dx][j + dy]
+        (px, py, loudness) = observation
+        if loudness < 0.001:
+            return newBeliefGrid
 
-                if totalNeighbors > 0:
-                    newBeliefGrid[i][j] = totalProbability / totalNeighbors
-                else:
-                    newBeliefGrid[i][j] = 0
+        L = get_perceived_likelihood_grid(
+            (self.game.marco.pos[0], self.game.marco.pos[1]), # observer position
+            (px, py), # perceived position
+            loudness, # perceived loudness
+            (H, W), # grid shape
+        )
+        
+        for i in range(H):
+            for j in range(W):
+                newBeliefGrid[i][j] *= L[i][j]
 
         return self.normalize_belief_grid(newBeliefGrid)
-                
+
+
+    def get_diffused_prior_belief_grid(self, beliefGrid, loudness):
+        actions_liklihoods = self.pool.get_perceived_sound_actions_liklihoods(loudness)
+        newBeliefGrid = copy.deepcopy(beliefGrid)
+
+        for i in range(len(newBeliefGrid)):
+            for j in range(len(newBeliefGrid[0])):
+                for action in actions_liklihoods:
+                    if action == "yell":
+                        continue
+                    dx, dy = action
+                    new_x = i - dx
+                    new_y = j - dy
+                    if self.pool.in_bounds(new_x, new_y):
+                        newBeliefGrid[i][j] += actions_liklihoods[action] * beliefGrid[new_x][new_y]
+
+        return self.normalize_belief_grid(newBeliefGrid)

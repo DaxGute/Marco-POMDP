@@ -37,7 +37,7 @@ class MarcoPolo:
         random.shuffle(available_positions)
 
         # seeker starts at first available position
-        self.marco = Seeker(available_positions[0][0], available_positions[0][1], self.pool)
+        self.marco = Seeker(available_positions[0][0], available_positions[0][1], self.pool, self.num_polos)
         self.marco.game = self
 
         # hiders start at subsequent positions
@@ -66,7 +66,7 @@ class MarcoPolo:
             sound = self.pool.get_action_sound(polo.pos, (dx, dy))
 
         loudness = sound.observed_sound_loudness(self.marco.pos)
-        polo.beliefGrid = polo.get_updated_belief_grid([(sound.pos[0], sound.pos[1], loudness)])
+        polo.beliefGrid = polo.get_updated_belief_grid(polo.beliefGrid, (sound.pos[0], sound.pos[1], loudness))
         
         return sound
 
@@ -95,8 +95,8 @@ class MarcoPolo:
         for polo in self.polos:
             sound = self.simulate_polo_action(polo)
 
-            observation = [(sound.pos[0], sound.pos[1], sound.observed_sound_loudness(self.marco.pos))]
-            polo.beliefGrid = polo.get_updated_belief_grid(observation)
+            observation = (sound.pos[0], sound.pos[1], sound.observed_sound_loudness(self.marco.pos))
+            polo.beliefGrid = polo.get_updated_belief_grid(polo.beliefGrid, observation)
 
             (pos, loudness) = sound.observed_sound(self.marco.pos)
 
@@ -104,9 +104,8 @@ class MarcoPolo:
             y = max(0, min(pos[1], len(self.pool.grid[0])-1))
 
             observations.append((x, y, loudness))
-
             
-        self.marco.beliefGrid = self.marco.get_updated_belief_grid(observations)
+        self.marco.beliefGrids = self.marco.get_updated_belief_grids(observations)
 
         self.round_yell = False
 
@@ -119,31 +118,25 @@ class MarcoPolo:
         self.pool.render(self.marco, self.polos)
     
     def display_diagnostics(self):
+        print("--------------------------------")
 
         print(f"Time: {self.time}")
-        if self.diagnostics[0]:
-            
-            marco_action_rewards = [(reward, action) for action, reward in self.marco.lastActionRewardPairs.items()]
-            marco_action_rewards.sort(key=lambda x: x[0], reverse=True)
-            
-            print("Marco Best Action: " + str(marco_action_rewards[0][1]) + " with reward: " + str(marco_action_rewards[0][0]))
-            print("Marco Second Best Action: " + str(marco_action_rewards[1][1]) + " with reward: " + str(marco_action_rewards[1][0]))
-            print(marco_action_rewards)
+
+        print("\nMarco:")
+        combinedBeliefGrid = []
+        H = len(self.marco.beliefGrids[0])
+        W = len(self.marco.beliefGrids[0][0])
         
-        # for i in range(1, len(self.diagnostics)):
-        #     if self.diagnostics[i]:
-        #         if len(self.polos[i].lastActionRewardPairs.items()) > 0:
-        #             polo_action_rewards = [(reward, action) for action, reward in self.polos[i].lastActionRewardPairs.items()]
-        #             polo_action_rewards.sort(key=lambda x: x[0], reverse=True)
-
-        #             print(f"Polo {i} Best Action: {polo_action_rewards[0][1]} with reward: {polo_action_rewards[0][0]}")
-        #             print(f"Polo {i} Second Best Action: {polo_action_rewards[1][1]} with reward: {polo_action_rewards[1][0]}")
-        #         else:
-        #             print(f"Polo {i} has no actions")
-
-        print("Marco's belief grid:")
-        self.display_belief_grid(self.marco.beliefGrid)
-
+        # for i in range(H):
+        #     row = []
+        #     for j in range(W):
+        #         max_likelihood = max(beliefGrid[i][j] for beliefGrid in self.marco.beliefGrids)
+        #         row.append(max_likelihood)
+        #     combinedBeliefGrid.append(row)
+        # self.display_belief_grid(combinedBeliefGrid)
+        self.display_action_rewards(self.marco)
+        
+        print("\nClosest Polo:")
         closest_polo = None
         closest_distance = float('inf')
         for polo in self.polos:
@@ -151,8 +144,25 @@ class MarcoPolo:
             if distance < closest_distance:
                 closest_distance = distance
                 closest_polo = polo
-        print(f"Closest polo: {closest_polo.pos} with distance: {closest_distance}")
-        self.display_belief_grid(closest_polo.beliefGrid)
+        # self.display_belief_grid(closest_polo.beliefGrid)
+        self.display_action_rewards(closest_polo)
+
+        print("--------------------------------")
+
+
+    def display_action_rewards(self, player):
+        player_type = type(player).__name__
+        
+        if not player.lastActionRewardPairs:
+            print(f"{player_type} has no action rewards.")
+            return
+        
+        action_rewards = [(reward, action) for action, reward in player.lastActionRewardPairs.items()]
+        action_rewards.sort(key=lambda x: x[0], reverse=True)
+        
+        print(f"{player_type} Taken Action: {action_rewards[0][1]} with reward: {action_rewards[0][0]}")
+        
+        print(action_rewards)
 
 
     def display_belief_grid(self, beliefGrid):
