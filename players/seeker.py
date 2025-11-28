@@ -16,6 +16,11 @@ class Seeker(Player):
         for i in range(num_polos):
             self.beliefGrids.append(self.initialize_belief_grid())
 
+        self.l1 = 1e2   # certainty (now normalized to [0,1])
+        self.l2 = 1e2   # distance
+        self.l3 = 1e8   # capture
+        self.l4 = 1e1   # time
+
 
     def get_actions(self):
         available_actions = super().get_actions()
@@ -25,10 +30,36 @@ class Seeker(Player):
 
         return available_actions
 
+    def get_belief_grid_reward(self, beliefGrid, seekerPos):
+        certaintyReward = 0
+        distanceReward = 0
+        capturedReward = 0
+        timeReward = -self.game.time
+
+        for i in range(len(beliefGrid)):
+            for j in range(len(beliefGrid[0])):
+                if beliefGrid[i][j] > 0:
+                    certaintyReward += beliefGrid[i][j] ** 2
+
+                    distance = math.sqrt((i - seekerPos[0]) ** 2 + (j - seekerPos[1]) ** 2)
+                    if distance < 1:
+                        capturedReward += beliefGrid[i][j]
+                    else:
+                        distanceReward += beliefGrid[i][j] * (1 / distance)
+
+        compositeReward = (
+            self.l1 * certaintyReward
+            + self.l2 * distanceReward
+            + self.l3 * capturedReward
+            + self.l4 * timeReward
+        )
+
+        return compositeReward
+
     def get_reward(self, beliefGrids, seekerPos):
         total_reward = 0
         for i in range(len(beliefGrids)):
-            total_reward += super().get_reward(beliefGrids[i], seekerPos)
+            total_reward += self.get_belief_grid_reward(beliefGrids[i], seekerPos)
 
         return total_reward
 
@@ -130,3 +161,19 @@ class Seeker(Player):
         newBeliefGrids = self.get_updated_belief_grids(observations)
 
         return newBeliefGrids
+
+
+    def display_belief_grid(self):
+        combinedBeliefGrid = []
+        H = len(self.beliefGrids[0])
+        W = len(self.beliefGrids[0][0])
+        
+        for i in range(H):
+            row = []
+            for j in range(W):
+                max_likelihood = max(beliefGrid[i][j] for beliefGrid in self.beliefGrids)
+                row.append(max_likelihood)
+            combinedBeliefGrid.append(row)
+
+        self.beliefGrid = combinedBeliefGrid
+        super().display_belief_grid()

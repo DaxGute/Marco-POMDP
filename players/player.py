@@ -3,19 +3,22 @@ import math
 from physics.pool import Pool
 from physics.sound import Sound, get_perceived_likelihood_grid
 
-
+SYMBOLS = {
+    0: "▯",
+    0.25: "░",
+    0.5: "▒",
+    0.75: "▓",
+    1: "█",
+}
 
 class Player:
     def __init__(self, x: int, y: int, pool: Pool):
         self.pos = (x, y)
         self.pool = pool
-        
-        self.l1 = 1e2   # certainty (now normalized to [0,1])
-        self.l2 = 1e2   # distance
-        self.l3 = 1e8   # capture
-        self.l4 = 1e1   # time
 
         self.lastActionRewardPairs = {}
+
+        self.beliefGrid = self.initialize_belief_grid()
 
 
     def initialize_belief_grid(self):
@@ -52,32 +55,6 @@ class Player:
                 beliefGrid[i][j] /= z
         return beliefGrid
 
-
-    def get_reward(self, beliefGrid, seekerPos):
-        certaintyReward = 0
-        distanceReward = 0
-        capturedReward = 0
-        timeReward = -self.game.time
-
-        for i in range(len(beliefGrid)):
-            for j in range(len(beliefGrid[0])):
-                if beliefGrid[i][j] > 0:
-                    certaintyReward += beliefGrid[i][j] ** 2
-
-                    distance = math.sqrt((i - seekerPos[0]) ** 2 + (j - seekerPos[1]) ** 2)
-                    if distance < 1:
-                        capturedReward += beliefGrid[i][j]
-                    else:
-                        distanceReward += beliefGrid[i][j] * (1 / distance)
-
-        compositeReward = (
-            self.l1 * certaintyReward
-            + self.l2 * distanceReward
-            + self.l3 * capturedReward
-            + self.l4 * timeReward
-        )
-
-        return compositeReward
 
 
     def get_actions(self):
@@ -142,3 +119,37 @@ class Player:
                         newBeliefGrid[new_x][new_y] += actions_liklihoods[action] * beliefGrid[i][j]
 
         return self.normalize_belief_grid(newBeliefGrid)
+
+
+    def display_belief_grid(self):
+        grid = self.beliefGrid
+    
+        eps = 1e-12
+
+        logs = [[math.log(max(cell, eps)) for cell in row] for row in grid]
+
+        min_log = min(min(row) for row in logs)
+        max_log = max(max(row) for row in logs)
+        span = max_log - min_log
+
+        for row in logs:
+            line = ""
+            for v in row:
+                z = (v - min_log) / span
+                
+                level = round(z * 4) / 4
+                line += SYMBOLS[level]
+            print(line)
+
+        
+    def display_action_rewards(self):
+        if not self.lastActionRewardPairs:
+            print(f"I have no action rewards.")
+            return
+        
+        action_rewards = [(reward, action) for action, reward in self.lastActionRewardPairs.items()]
+        action_rewards.sort(key=lambda x: x[0], reverse=True)
+        
+        print(f"Taken Action: {action_rewards[0][1]} with reward: {action_rewards[0][0]}")
+        
+        print(action_rewards)

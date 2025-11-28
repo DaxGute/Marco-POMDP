@@ -6,13 +6,7 @@ from physics.sound import Sound
 from players.seeker import Seeker
 from players.hider import Hider
 
-SYMBOLS = {
-    0: "▯",
-    0.25: "░",
-    0.5: "▒",
-    0.75: "▓",
-    1: "█",
-}
+
 
 class MarcoPolo:
 
@@ -123,18 +117,8 @@ class MarcoPolo:
         print(f"Time: {self.time}")
 
         print("\nMarco:")
-        combinedBeliefGrid = []
-        H = len(self.marco.beliefGrids[0])
-        W = len(self.marco.beliefGrids[0][0])
-        
-        for i in range(H):
-            row = []
-            for j in range(W):
-                max_likelihood = max(beliefGrid[i][j] for beliefGrid in self.marco.beliefGrids)
-                row.append(max_likelihood)
-            combinedBeliefGrid.append(row)
-        self.display_belief_grid(combinedBeliefGrid)
-        self.display_action_rewards(self.marco)
+        self.marco.display_belief_grid()
+        self.marco.display_action_rewards()
         
         print("\nClosest Polo:")
         closest_polo = None
@@ -144,44 +128,12 @@ class MarcoPolo:
             if distance < closest_distance:
                 closest_distance = distance
                 closest_polo = polo
-        # self.display_belief_grid(closest_polo.beliefGrid)
-        self.display_action_rewards(closest_polo)
+        closest_polo.display_belief_grid()
+        closest_polo.display_action_rewards()
 
         print("--------------------------------")
 
 
-    def display_action_rewards(self, player):
-        player_type = type(player).__name__
-        
-        if not player.lastActionRewardPairs:
-            print(f"{player_type} has no action rewards.")
-            return
-        
-        action_rewards = [(reward, action) for action, reward in player.lastActionRewardPairs.items()]
-        action_rewards.sort(key=lambda x: x[0], reverse=True)
-        
-        print(f"{player_type} Taken Action: {action_rewards[0][1]} with reward: {action_rewards[0][0]}")
-        
-        print(action_rewards)
 
-
-    def display_belief_grid(self, beliefGrid):
-        grid = beliefGrid
     
-        eps = 1e-12
-
-        logs = [[math.log(max(cell, eps)) for cell in row] for row in grid]
-
-        min_log = min(min(row) for row in logs)
-        max_log = max(max(row) for row in logs)
-        span = max_log - min_log
-
-        for row in logs:
-            line = ""
-            for v in row:
-                z = (v - min_log) / span
-                
-                level = round(z * 4) / 4
-                line += SYMBOLS[level]
-            print(line)
             
