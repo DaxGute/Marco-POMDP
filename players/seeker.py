@@ -158,11 +158,6 @@ class Seeker(Player):
 
         newBeliefGrids = self.get_updated_belief_grids(observations)
 
-        print(f"Yell evaluation: observations = {observations}")
-        print(f"Current belief max values: {[max(max(row) for row in bg) for bg in self.beliefGrids]}")
-        print(f"New belief max values: {[max(max(row) for row in bg) for bg in newBeliefGrids]}")
-    
-
         return newBeliefGrids
 
 

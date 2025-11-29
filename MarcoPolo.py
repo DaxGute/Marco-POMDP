@@ -50,8 +50,6 @@ class MarcoPolo:
     def simulate_polo_action(self, polo):
         sound = None
 
-        dist = math.hypot(polo.pos[0] - self.marco.pos[0], polo.pos[1] - self.marco.pos[1])
-
         if self.round_yell:  # removing distance requirement
             sound = self.pool.get_action_sound(polo.pos, "yell")
         else:
@@ -59,9 +57,6 @@ class MarcoPolo:
             polo.pos = (polo.pos[0] + dx, polo.pos[1] + dy)
             sound = self.pool.get_action_sound(polo.pos, (dx, dy))
 
-        loudness = sound.observed_sound_loudness(self.marco.pos)
-        polo.beliefGrid = polo.get_updated_belief_grid(polo.beliefGrid, (sound.pos[0], sound.pos[1], loudness))
-        
         return sound
 
     def simulate_marco_action(self):
@@ -89,7 +84,10 @@ class MarcoPolo:
         for polo in self.polos:
             sound = self.simulate_polo_action(polo)
 
-            observation = (sound.pos[0], sound.pos[1], sound.observed_sound_loudness(self.marco.pos))
+            dist = math.hypot(polo.pos[0] - self.marco.pos[0], polo.pos[1] - self.marco.pos[1])
+            dist = max(dist, 1)
+
+            observation = (sound.pos[0], sound.pos[1], sound.loudness / (dist * dist))
             polo.beliefGrid = polo.get_updated_belief_grid(polo.beliefGrid, observation)
 
             (pos, loudness) = sound.observed_sound(self.marco.pos)

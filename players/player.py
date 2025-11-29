@@ -78,9 +78,18 @@ class Player:
     def get_updated_belief_grid(self, beliefGrid, observation):
         H = len(beliefGrid)
         W = len(beliefGrid[0])
-        newBeliefGrid = self.get_diffused_prior_belief_grid(beliefGrid, observation[2])
 
         (px, py, loudness) = observation
+
+        dist = math.hypot(px - self.game.marco.pos[0], py - self.game.marco.pos[1])
+        source_loudness = loudness * (dist * dist)
+
+        newBeliefGrid = self.get_diffused_prior_belief_grid(beliefGrid, source_loudness)
+
+        print("beliefGrid:")
+        self.doggalicious_display_belief_grid(beliefGrid)
+        print("newBeliefGrid:")
+        self.doggalicious_display_belief_grid(newBeliefGrid)
 
         L = get_perceived_likelihood_grid(
             (self.game.marco.pos[0], self.game.marco.pos[1]), # observer position
@@ -88,7 +97,10 @@ class Player:
             loudness, # perceived loudness
             (H, W), # grid shape
         )
-        
+
+        print("L:")
+        self.doggalicious_display_belief_grid(L)
+
         for i in range(H):
             for j in range(W):
                 newBeliefGrid[i][j] *= L[i][j]
@@ -119,6 +131,26 @@ class Player:
                         newBeliefGrid[new_x][new_y] += actions_liklihoods[action] * beliefGrid[i][j]
 
         return self.normalize_belief_grid(newBeliefGrid)
+
+    def doggalicious_display_belief_grid(self, beliefGrid):
+        grid = beliefGrid
+    
+        eps = 1e-12
+
+        logs = [[math.log(max(cell, eps)) for cell in row] for row in grid]
+
+        min_log = min(min(row) for row in logs)
+        max_log = max(max(row) for row in logs)
+        span = max_log - min_log
+
+        for row in logs:
+            line = ""
+            for v in row:
+                z = (v - min_log) / span
+                
+                level = round(z * 4) / 4
+                line += SYMBOLS[level]
+            print(line)
 
 
     def display_belief_grid(self):

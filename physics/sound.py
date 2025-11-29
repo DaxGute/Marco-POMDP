@@ -3,9 +3,9 @@ import random
 import math
 from typing import List, Tuple
 
-SIGMA_R_SCALE: float = 3.0   # radial uncertainty 
-SIGMA_T_SCALE: float = 1.0   # tangential uncertainty 
-SIGMA_DB_SCALE: float = 2.0
+SIGMA_R_SCALE: float = 1.5   # radial uncertainty 
+SIGMA_T_SCALE: float = 0.5   # tangential uncertainty 
+SIGMA_DB_SCALE: float = 0.5
 
 def get_perceived_likelihood_grid(observer_pos, perceived_pos, perceived_loudness, grid_shape): # p(sound from location | observation) = p(hider at location | observation)
     ox, oy = observer_pos
@@ -43,7 +43,11 @@ def get_perceived_likelihood_grid(observer_pos, perceived_pos, perceived_loudnes
     return likelihood_grid
 
 def get_actual_sound_likelihood(actual_loudness, perceived_loudness):
-    return math.exp(-0.5 * (actual_loudness - perceived_loudness)**2 / SIGMA_DB_SCALE**2)
+
+    actual_db = 10 * math.log10(actual_loudness)
+    perceived_db = 10 * math.log10(perceived_loudness)
+
+    return math.exp(-0.5 * (actual_db - perceived_db)**2 / SIGMA_DB_SCALE**2)
 
 class Sound:
 
@@ -91,7 +95,7 @@ class Sound:
         dx = sx - ox
         dy = sy - oy
         dist = math.sqrt(dx*dx + dy*dy)
-        dist = max(dist, 0.0001)
+        dist = max(dist, 1)
 
         loudness_observed = self.loudness / (dist * dist)
 
