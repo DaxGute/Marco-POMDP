@@ -52,7 +52,7 @@ class MarcoPolo:
 
         dist = math.hypot(polo.pos[0] - self.marco.pos[0], polo.pos[1] - self.marco.pos[1])
 
-        if self.round_yell and dist >= 2:
+        if self.round_yell:  # removing distance requirement
             sound = self.pool.get_action_sound(polo.pos, "yell")
         else:
             (dx, dy) = polo.choose_action()

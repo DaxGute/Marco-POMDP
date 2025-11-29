@@ -11,9 +11,10 @@ class Hider(Player):
         self.beliefGrid = self.initialize_belief_grid()
 
         self.l1 = 1e2   # certainty (now normalized to [0,1])
-        self.l2 = 1e2   # distance
+        self.l2 = 1e4   # distance
         self.l3 = 1e8   # capture
         self.l4 = 1e1   # time
+
 
 
     def get_actions(self):
@@ -32,8 +33,7 @@ class Hider(Player):
 
         return actions
 
-
-    def get_reward(self, beliefGrid, seekerPos):
+    def get_reward(self, beliefGrid, seekerPos, hider_pos):
         certaintyPenalty = 0
         distanceReward = 0
         capturePenalty = 0
@@ -44,7 +44,7 @@ class Hider(Player):
                 if beliefGrid[i][j] > 0:
                     certaintyPenalty -= beliefGrid[i][j] ** 2
 
-        distance = math.sqrt((self.pos[0] - seekerPos[0]) ** 2 + (self.pos[1] - seekerPos[1]) ** 2)
+        distance = math.sqrt((hider_pos[0] - seekerPos[0]) ** 2 + (hider_pos[1] - seekerPos[1]) ** 2)
         if distance < 1:
             capturePenalty -= 1
 
@@ -74,7 +74,7 @@ class Hider(Player):
             loudness = sound.observed_sound_loudness(self.game.marco.pos)
             newBeliefGrid = self.get_updated_belief_grid(self.beliefGrid, (origin[0], origin[1], loudness))
                 
-            reward = self.get_reward(newBeliefGrid, self.game.marco.pos)
+            reward = self.get_reward(newBeliefGrid, self.game.marco.pos, origin)
             self.lastActionRewardPairs[(action)] = reward
             if reward >= best_reward:
                 best_reward = reward

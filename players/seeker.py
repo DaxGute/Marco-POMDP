@@ -16,7 +16,7 @@ class Seeker(Player):
         for i in range(num_polos):
             self.beliefGrids.append(self.initialize_belief_grid())
 
-        self.l1 = 1e2   # certainty (now normalized to [0,1])
+        self.l1 = 1e6   # certainty (now normalized to [0,1])
         self.l2 = 1e2   # distance
         self.l3 = 1e8   # capture
         self.l4 = 1e1   # time
@@ -148,17 +148,20 @@ class Seeker(Player):
 
             center = [int(centroid_x), int(centroid_y)]
 
-            dist = math.hypot(center[0] - self.pos[0], center[1] - self.pos[1])
-            
-            if dist < 2:
-                sound = self.pool.get_action_sound(center, (0, 0))
-            else:
-                sound = self.pool.get_action_sound(center, "yell")
+            # dist = math.hypot(center[0] - self.pos[0], center[1] - self.pos[1])
+            # purposefully not adding yell witholds
+
+            sound = self.pool.get_action_sound(center, "yell")
             loudness = sound.observed_sound_loudness(self.pos)
 
             observations.append((center[0], center[1], loudness))
 
         newBeliefGrids = self.get_updated_belief_grids(observations)
+
+        print(f"Yell evaluation: observations = {observations}")
+        print(f"Current belief max values: {[max(max(row) for row in bg) for bg in self.beliefGrids]}")
+        print(f"New belief max values: {[max(max(row) for row in bg) for bg in newBeliefGrids]}")
+    
 
         return newBeliefGrids
 
