@@ -116,7 +116,7 @@ class MarcoPolo:
 
         print("\nMarco:")
         self.marco.display_belief_grid()
-        self.marco.display_action_rewards()
+        # self.marco.display_action_rewards()
         
         print("\nClosest Polo:")
         closest_polo = None
@@ -126,8 +126,8 @@ class MarcoPolo:
             if distance < closest_distance:
                 closest_distance = distance
                 closest_polo = polo
-        closest_polo.display_belief_grid()
-        closest_polo.display_action_rewards()
+        # closest_polo.display_belief_grid()
+        # closest_polo.display_action_rewards()
 
         print("--------------------------------")
 

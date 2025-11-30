@@ -86,9 +86,6 @@ class Player:
 
         newBeliefGrid = self.get_diffused_prior_belief_grid(beliefGrid, source_loudness)
 
-        print("beliefGrid:")
-        self.doggalicious_display_belief_grid(beliefGrid)
-        print("newBeliefGrid:")
         self.doggalicious_display_belief_grid(newBeliefGrid)
 
         L = get_perceived_likelihood_grid(
@@ -97,9 +94,6 @@ class Player:
             loudness, # perceived loudness
             (H, W), # grid shape
         )
-
-        print("L:")
-        self.doggalicious_display_belief_grid(L)
 
         for i in range(H):
             for j in range(W):

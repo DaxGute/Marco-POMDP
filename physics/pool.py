@@ -94,26 +94,43 @@ class Pool:
     def get_action_sound(self, pos, action):
         return Sound(pos, SOUND_ACTIONS[action])
 
+
     def get_perceived_sound_actions_liklihoods(self, loudness):
-        actions_log_liklihoods = {}
-    
-        for action in SOUND_ACTIONS:
-            likelihood = get_actual_sound_likelihood(SOUND_ACTIONS[action], loudness)
-            actions_log_liklihoods[action] = math.log(max(likelihood, 1e-300))
-        
-        # Log-sum-exp trick for normalization
-        max_log = max(actions_log_liklihoods.values())
-        
-        actions_liklihoods = {}
+        # Silence logic done in dB space (much more meaningful)
+        if loudness <= 0:
+            observed_db = -300  # force below threshold
+        else:
+            observed_db = 10 * math.log10(loudness)
+
+        SILENCE_DB_THRESHOLD = -25  # TUNE THIS (e.g., -20 dB also viable)
+
+        if observed_db < SILENCE_DB_THRESHOLD:
+            # Strongly enforce stillness
+            return {a: (1.0 if a == (0, 0) else 0.0) for a in SOUND_ACTIONS}
+
+        actions_log_likelihoods = {}
+
+        for action, expected in SOUND_ACTIONS.items():
+            likelihood = get_actual_sound_likelihood(expected, loudness)
+
+            # protect from numerical underflow
+            if likelihood < 1e-300:
+                actions_log_likelihoods[action] = -1e300
+            else:
+                actions_log_likelihoods[action] = math.log(likelihood)
+
+        # log-sum-exp normalization
+        max_log = max(actions_log_likelihoods.values())
         total = 0.0
-        
-        for action in actions_log_liklihoods:
-            prob = math.exp(actions_log_liklihoods[action] - max_log)
-            actions_liklihoods[action] = prob
+        actions_likelihoods = {}
+
+        for action, logL in actions_log_likelihoods.items():
+            prob = math.exp(logL - max_log)
+            actions_likelihoods[action] = prob
             total += prob
-        
-        # Normalize
-        for action in actions_liklihoods:
-            actions_liklihoods[action] /= total
-        
-        return actions_liklihoods
+
+        if total > 0:
+            for action in actions_likelihoods:
+                actions_likelihoods[action] /= total
+
+        return actions_likelihoods
