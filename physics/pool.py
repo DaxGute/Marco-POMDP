@@ -48,7 +48,7 @@ SOUND_ACTIONS = {
     (-2, 2): SOUND_SCALE["3"],
     (2, -2): SOUND_SCALE["3"],
     (2, 2): SOUND_SCALE["3"],
-    "yell": SOUND_SCALE["4"],
+    "yell": SOUND_SCALE["2"],
 }
 
 class Pool:
@@ -76,14 +76,12 @@ class Pool:
         return self.baseGrid[x][y] != 1
 
     def update_grid(self, marco, polos):
-        """Overlay player positions onto a copy of the base grid."""
         self.grid = copy.deepcopy(self.baseGrid)
         for polo in polos:
             self.grid[polo.pos[0]][polo.pos[1]] = 2
         self.grid[marco.pos[0]][marco.pos[1]] = 3
 
     def render(self, marco, polos):
-        """Render the pool with the given players."""
         self.update_grid(marco, polos)
 
         #print("\033[2J\033[H", end="")
@@ -96,41 +94,46 @@ class Pool:
 
 
     def get_perceived_sound_actions_liklihoods(self, loudness):
-        # Silence logic done in dB space (much more meaningful)
-        if loudness <= 0:
-            observed_db = -300  # force below threshold
-        else:
-            observed_db = 10 * math.log10(loudness)
+        """
+        Return probability distribution over SOUND_ACTIONS based solely on sound likelihood,
+        without explicit silence handling.
+        """
 
-        SILENCE_DB_THRESHOLD = -25  # TUNE THIS (e.g., -20 dB also viable)
+        LOG_ZERO = float('-inf')     # mathematically correct "impossible" value
+        UNDERFLOW_CUTOFF = -700      # avoid exp(-very_large) underflow
 
-        if observed_db < SILENCE_DB_THRESHOLD:
-            # Strongly enforce stillness
-            return {a: (1.0 if a == (0, 0) else 0.0) for a in SOUND_ACTIONS}
-
-        actions_log_likelihoods = {}
-
+        # Compute log-likelihoods
+        log_likelihoods = {}
         for action, expected in SOUND_ACTIONS.items():
             likelihood = get_actual_sound_likelihood(expected, loudness)
 
-            # protect from numerical underflow
-            if likelihood < 1e-300:
-                actions_log_likelihoods[action] = -1e300
+            if likelihood <= 0:
+                log_likelihoods[action] = LOG_ZERO
             else:
-                actions_log_likelihoods[action] = math.log(likelihood)
+                logL = math.log(likelihood)
+                log_likelihoods[action] = max(logL, UNDERFLOW_CUTOFF)  # clamp extreme negatives
 
-        # log-sum-exp normalization
-        max_log = max(actions_log_likelihoods.values())
-        total = 0.0
-        actions_likelihoods = {}
+        # Find max log-likelihood (log-sum-exp trick)
+        max_log = max(log_likelihoods.values())
+        prob_sum = 0.0
+        probs = {}
 
-        for action, logL in actions_log_likelihoods.items():
-            prob = math.exp(logL - max_log)
-            actions_likelihoods[action] = prob
-            total += prob
+        # Convert back to probabilities
+        for action, logL in log_likelihoods.items():
+            if logL == LOG_ZERO:
+                probs[action] = 0.0
+            else:
+                prob = math.exp(logL - max_log)
+                probs[action] = prob
+                prob_sum += prob
 
-        if total > 0:
-            for action in actions_likelihoods:
-                actions_likelihoods[action] /= total
+        # Normalize result
+        if prob_sum > 0:
+            for action in probs:
+                probs[action] /= prob_sum
+        else:
+            # If all collapsed numerically → return uniform over actions (or could fallback to zeros)
+            n_actions = len(SOUND_ACTIONS)
+            probs = {action: 1.0 / n_actions for action in SOUND_ACTIONS}
 
-        return actions_likelihoods
+        return probs

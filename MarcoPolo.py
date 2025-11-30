@@ -17,7 +17,7 @@ class MarcoPolo:
 
         self.init_players()
 
-        self.round_yell = False
+        self.rounds_since_yell = 5
 
         if diagnostics != False:
             self.diagnostics = diagnostics
@@ -50,12 +50,14 @@ class MarcoPolo:
     def simulate_polo_action(self, polo):
         sound = None
 
-        if self.round_yell:  # removing distance requirement
-            sound = self.pool.get_action_sound(polo.pos, "yell")
-        else:
-            (dx, dy) = polo.choose_action()
-            polo.pos = (polo.pos[0] + dx, polo.pos[1] + dy)
-            sound = self.pool.get_action_sound(polo.pos, (dx, dy))
+        (dx, dy) = polo.choose_action()
+        polo.pos = (polo.pos[0] + dx, polo.pos[1] + dy)
+        sound = self.pool.get_action_sound(polo.pos, (dx, dy))
+
+        if self.rounds_since_yell == 0:  
+            yell = self.pool.get_action_sound(polo.pos, "yell")
+            if yell.loudness > sound.loudness:
+                sound = yell
 
         return sound
 
@@ -63,7 +65,7 @@ class MarcoPolo:
         action = self.marco.choose_action()
         
         if action == "yell":
-            self.round_yell = True
+            self.rounds_since_yell = 0
         else:
             (dx, dy) = action
             new_x = self.marco.pos[0] + dx
@@ -99,7 +101,7 @@ class MarcoPolo:
             
         self.marco.beliefGrids = self.marco.get_updated_belief_grids(observations)
 
-        self.round_yell = False
+        self.rounds_since_yell += 1
 
         self.time += 1
 

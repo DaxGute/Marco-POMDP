@@ -25,8 +25,8 @@ class Seeker(Player):
     def get_actions(self):
         available_actions = super().get_actions()
 
-        available_actions.append("yell")
-        available_actions.remove((0,0))
+        if self.game.rounds_since_yell > 5:
+            available_actions.append("yell")
 
         return available_actions
 
@@ -147,9 +147,6 @@ class Seeker(Player):
             centroid_y = sum(weights[i] * coords[i][1] for i in range(len(coords))) / total_weight
 
             center = [int(centroid_x), int(centroid_y)]
-
-            # dist = math.hypot(center[0] - self.pos[0], center[1] - self.pos[1])
-            # purposefully not adding yell witholds
 
             sound = self.pool.get_action_sound(center, "yell")
             loudness = sound.observed_sound_loudness(self.pos)

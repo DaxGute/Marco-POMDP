@@ -10,7 +10,7 @@ class Hider(Player):
         super().__init__(x, y, pool)
         self.beliefGrid = self.initialize_belief_grid()
 
-        self.l1 = 1e2   # certainty (now normalized to [0,1])
+        self.l1 = 1e4   # certainty
         self.l2 = 1e4   # distance
         self.l3 = 1e8   # capture
         self.l4 = 1e1   # time

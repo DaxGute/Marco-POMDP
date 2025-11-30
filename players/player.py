@@ -47,12 +47,13 @@ class Player:
             for j in range(len(beliefGrid[0])):
                 z += beliefGrid[i][j]
 
-        # if z < 1e-10:
+        # if z < 1e-300:
         #     return self.initialize_belief_grid()
 
         for i in range(len(beliefGrid)):
             for j in range(len(beliefGrid[0])):
                 beliefGrid[i][j] /= z
+                beliefGrid[i][j] = max(beliefGrid[i][j], 1e-100)
         return beliefGrid
 
 
@@ -81,12 +82,8 @@ class Player:
 
         (px, py, loudness) = observation
 
-        dist = math.hypot(px - self.game.marco.pos[0], py - self.game.marco.pos[1])
-        source_loudness = loudness * (dist * dist)
 
-        newBeliefGrid = self.get_diffused_prior_belief_grid(beliefGrid, source_loudness)
-
-        self.doggalicious_display_belief_grid(newBeliefGrid)
+        newBeliefGrid = self.get_diffused_prior_belief_grid(beliefGrid, loudness)
 
         L = get_perceived_likelihood_grid(
             (self.game.marco.pos[0], self.game.marco.pos[1]), # observer position
@@ -99,15 +96,24 @@ class Player:
             for j in range(W):
                 newBeliefGrid[i][j] *= L[i][j]
 
+        newBeliefGrid[self.game.marco.pos[0]][self.game.marco.pos[1]] = 0
+
         return self.normalize_belief_grid(newBeliefGrid)
 
 
     def get_diffused_prior_belief_grid(self, beliefGrid, loudness):
-        actions_liklihoods = self.pool.get_perceived_sound_actions_liklihoods(loudness)
         newBeliefGrid = [[0.0 for _ in row] for row in beliefGrid]
 
         for i in range(len(newBeliefGrid)):
             for j in range(len(newBeliefGrid[0])):
+                if (i, j) == self.game.marco.pos:
+                    continue
+                if  not self.pool.in_bounds(i,j):
+                    continue
+
+                dist = math.hypot(i - self.game.marco.pos[0], j - self.game.marco.pos[1])
+                source_loudness = loudness * (dist * dist)
+                actions_liklihoods = self.pool.get_perceived_sound_actions_liklihoods(source_loudness)
 
                 if beliefGrid[i][j] == 0:
                     continue
@@ -119,10 +125,10 @@ class Player:
                     else:   
                         dx, dy = action
 
-                    new_x = i + dx
-                    new_y = j + dy
-                    if self.pool.in_bounds(new_x, new_y):
-                        newBeliefGrid[new_x][new_y] += actions_liklihoods[action] * beliefGrid[i][j]
+                    source_x = i - dx
+                    source_y = j - dy
+                    if self.pool.in_bounds(source_x, source_y):
+                        newBeliefGrid[i][j] += actions_liklihoods[action] * beliefGrid[source_x][source_y]
 
         return self.normalize_belief_grid(newBeliefGrid)
 
