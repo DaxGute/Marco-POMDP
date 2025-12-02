@@ -96,9 +96,6 @@ class MarcoPolo:
 
             (pos, loudness) = sound.observed_sound(self.marco.pos)
 
-            # In iterate_round(), after creating observation:
-            print(f"Polo actual: {polo.pos}, Perceived: {(sound.pos[0], sound.pos[1])}, Clamped: {(pos[0], pos[1])}")
-
             x = max(0, min(int(round(pos[0])), len(self.pool.grid)-1))
             y = max(0, min(int(round(pos[1])), len(self.pool.grid[0])-1))
 
@@ -115,7 +112,6 @@ class MarcoPolo:
     def render(self):
         """Render the current game state."""
         self.pool.render(self.marco, self.polos)
-        print("Marco's position: ", self.marco.pos, "Polos' positions: ", [polo.pos for polo in self.polos])
     
     def display_diagnostics(self):
         print("--------------------------------")

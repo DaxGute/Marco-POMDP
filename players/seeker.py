@@ -25,8 +25,7 @@ class Seeker(Player):
     def get_actions(self):
         available_actions = super().get_actions()
 
-        if self.game.rounds_since_yell > 5:
-            available_actions.append("yell")
+        available_actions.append("yell")
 
         return available_actions
 
