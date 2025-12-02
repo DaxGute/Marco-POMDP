@@ -47,9 +47,6 @@ class Player:
             for j in range(len(beliefGrid[0])):
                 z += beliefGrid[i][j]
 
-        # if z < 1e-300:
-        #     return self.initialize_belief_grid()
-
         for i in range(len(beliefGrid)):
             for j in range(len(beliefGrid[0])):
                 beliefGrid[i][j] /= z
@@ -91,15 +88,30 @@ class Player:
             loudness, # perceived loudness
             (H, W), # grid shape
         )
+        L = self.normalize_belief_grid(L)
 
         for i in range(H):
             for j in range(W):
-                newBeliefGrid[i][j] *= L[i][j]
+                newBeliefGrid[i][j] *= L[i][j]**3
 
         newBeliefGrid[self.game.marco.pos[0]][self.game.marco.pos[1]] = 0
 
         return self.normalize_belief_grid(newBeliefGrid)
 
+    # def diffuse_sharp_belief_grid(self, beliefGrid):
+    #     max_likelihood = max(max(row) for row in beliefGrid)
+    #     if max_likelihood_at_peak > 0.8:  
+    #         beliefGrid_diffused = [[0.0 for _ in range(W)] for _ in range(H)]
+    #         for i in range(H):
+    #             for j in range(W):
+    #                 # Add neighboring cells
+    #                 for di in [-1, 0, 1]:
+    #                     for dj in [-1, 0, 1]:
+    #                         ni, nj = i + di, j + dj
+    #                         if 0 <= ni < H and 0 <= nj < W:
+    #                             L_diffused[i][j] += L[ni][nj] * 0.2  # Spread 20% to neighbors
+    #                 beli_diffused[i][j] += L[i][j] * 0.8  # Keep 80% at original
+    #     return newBeliefGrid
 
     def get_diffused_prior_belief_grid(self, beliefGrid, loudness):
         newBeliefGrid = [[0.0 for _ in row] for row in beliefGrid]
@@ -115,9 +127,7 @@ class Player:
                 source_loudness = loudness * (dist * dist)
                 actions_liklihoods = self.pool.get_perceived_sound_actions_liklihoods(source_loudness)
 
-                if beliefGrid[i][j] == 0:
-                    continue
-                
+
                 for action in actions_liklihoods:
 
                     if action == "yell":
@@ -183,5 +193,3 @@ class Player:
         action_rewards.sort(key=lambda x: x[0], reverse=True)
         
         print(f"Taken Action: {action_rewards[0][1]} with reward: {action_rewards[0][0]}")
-        
-        print(action_rewards)

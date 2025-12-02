@@ -55,13 +55,15 @@ class MarcoPolo:
         sound = self.pool.get_action_sound(polo.pos, (dx, dy))
 
         if self.rounds_since_yell == 0:  
-            yell = self.pool.get_action_sound(polo.pos, "yell")
-            if yell.loudness > sound.loudness:
-                sound = yell
+            sound = self.pool.get_action_sound(polo.pos, "yell")
+            (dx, dy) = (0, 0)
 
         return sound
 
     def simulate_marco_action(self):
+        if self.rounds_since_yell < 3:
+            return 
+
         action = self.marco.choose_action()
         
         if action == "yell":
@@ -90,12 +92,15 @@ class MarcoPolo:
             dist = max(dist, 1)
 
             observation = (sound.pos[0], sound.pos[1], sound.loudness / (dist * dist))
-            polo.beliefGrid = polo.get_updated_belief_grid(polo.beliefGrid, observation)
+            polo.beliefGrid= polo.get_updated_belief_grid(polo.beliefGrid, observation)
 
             (pos, loudness) = sound.observed_sound(self.marco.pos)
 
-            x = max(0, min(pos[0], len(self.pool.grid)-1))
-            y = max(0, min(pos[1], len(self.pool.grid[0])-1))
+            # In iterate_round(), after creating observation:
+            print(f"Polo actual: {polo.pos}, Perceived: {(sound.pos[0], sound.pos[1])}, Clamped: {(pos[0], pos[1])}")
+
+            x = max(0, min(int(round(pos[0])), len(self.pool.grid)-1))
+            y = max(0, min(int(round(pos[1])), len(self.pool.grid[0])-1))
 
             observations.append((x, y, loudness))
             
@@ -110,6 +115,7 @@ class MarcoPolo:
     def render(self):
         """Render the current game state."""
         self.pool.render(self.marco, self.polos)
+        print("Marco's position: ", self.marco.pos, "Polos' positions: ", [polo.pos for polo in self.polos])
     
     def display_diagnostics(self):
         print("--------------------------------")

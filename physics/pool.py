@@ -13,7 +13,7 @@ SYMBOLS = {
 }
 
 SOUND_SCALE = {
-    "0": 1e-6,
+    "0": 1e-5,
     "1": 1e2,
     "1.5": 4e2,
     "2": 6e2,
@@ -137,3 +137,4 @@ class Pool:
             probs = {action: 1.0 / n_actions for action in SOUND_ACTIONS}
 
         return probs
+

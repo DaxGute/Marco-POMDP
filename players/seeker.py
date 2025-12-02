@@ -92,39 +92,42 @@ class Seeker(Player):
 
     def get_updated_belief_grids(self, observations):
         assignments = self.assign_observations(observations)
-        newBeliefGrids = copy.deepcopy(self.beliefGrids)
+        newBeliefGrids = [0 for _ in range(len(self.beliefGrids))]
 
         for hider_idx, obs_idx in assignments:
-            newBeliefGrids[hider_idx] = super().get_updated_belief_grid(newBeliefGrids[hider_idx], observations[obs_idx])
+            newBeliefGrids[hider_idx] = super().get_updated_belief_grid(self.beliefGrids[hider_idx], observations[obs_idx])
 
         return newBeliefGrids
 
     def assign_observations(self, observations): 
-        n_hiders = len(self.beliefGrids)
-        n_obs = len(observations)
+        # n_hiders = len(self.beliefGrids)
+        # n_obs = len(observations)
 
-        cost_matrix = np.zeros((n_hiders, n_obs))
+        # cost_matrix = np.zeros((n_hiders, n_obs))
 
-        H, W = len(self.beliefGrids[0]), len(self.beliefGrids[0][0])
+        # H, W = len(self.beliefGrids[0]), len(self.beliefGrids[0][0])
 
-        for obs_idx, (px, py, loudness) in enumerate(observations):
-            L = get_perceived_likelihood_grid(
-                (self.game.marco.pos[0], self.game.marco.pos[1]),
-                (px, py),
-                loudness,
-                (H, W),
-            )
+        # for obs_idx, (px, py, loudness) in enumerate(observations):
+        #     L = get_perceived_likelihood_grid(
+        #         (self.game.marco.pos[0], self.game.marco.pos[1]),
+        #         (px, py),
+        #         loudness,
+        #         (H, W),
+        #     )
 
-            for hider_idx in range(n_hiders):
-                beliefGrid = self.get_diffused_prior_belief_grid(self.beliefGrids[hider_idx], loudness)
-                likelihood = np.sum(np.array(beliefGrid) * np.array(L))
+        #     for hider_idx in range(n_hiders):
+        #         beliefGrid = self.get_diffused_prior_belief_grid(self.beliefGrids[hider_idx], loudness)
+        #         likelihood = np.sum(np.array(beliefGrid) * np.array(L))
 
-                cost_matrix[hider_idx, obs_idx] = -likelihood
+        #         cost_matrix[hider_idx, obs_idx] = -likelihood
         
-        row_idx, col_idx = linear_sum_assignment(cost_matrix)
-        assignments = list(zip(row_idx, col_idx))
+        # row_idx, col_idx = linear_sum_assignment(cost_matrix)
+        # assignments = list(zip(row_idx, col_idx))
 
-        return assignments
+        # print("assignments: " + str(assignments))
+
+        # return assignments
+        return [(i, i) for i in range(len(self.beliefGrids))]
 
 
     def expected_yelling_belief_grid(self):
