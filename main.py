@@ -2,6 +2,7 @@ import os
 import time
 
 from MarcoPolo import MarcoPolo
+from MarcoPoloPOMDP import MarcoPoloPOMDP
 
 POOLS_DIR = "pools"
 
@@ -15,7 +16,7 @@ def main():
 
     choice = input("\nEnter the number of the pool you want to load: ").strip()
 
-    game = MarcoPolo(pool_files[int(choice)], num_polos=3, diagnostics=[True, True, False, False])
+    game = MarcoPoloPOMDP(pool_files[int(choice)], num_polos=3, diagnostics=[True, True, False, False])
 
     game.render()
 
