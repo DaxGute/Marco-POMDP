@@ -19,6 +19,7 @@ def main():
     game = MarcoPoloPOMDP(pool_files[int(choice)], num_polos=3, diagnostics=[True, True, False, False])
 
     game.render()
+    game.display_diagnostics()
 
     while not game.iterate_round():
         game.render()

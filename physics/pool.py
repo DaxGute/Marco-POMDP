@@ -94,15 +94,10 @@ class Pool:
 
 
     def get_perceived_sound_actions_liklihoods(self, loudness):
-        """
-        Return probability distribution over SOUND_ACTIONS based solely on sound likelihood,
-        without explicit silence handling.
-        """
 
-        LOG_ZERO = float('-inf')     # mathematically correct "impossible" value
-        UNDERFLOW_CUTOFF = -700      # avoid exp(-very_large) underflow
+        LOG_ZERO = float('-inf')     
+        UNDERFLOW_CUTOFF = -700     
 
-        # Compute log-likelihoods
         log_likelihoods = {}
         for action, expected in SOUND_ACTIONS.items():
             likelihood = get_actual_sound_likelihood(expected, loudness)
@@ -111,14 +106,12 @@ class Pool:
                 log_likelihoods[action] = LOG_ZERO
             else:
                 logL = math.log(likelihood)
-                log_likelihoods[action] = max(logL, UNDERFLOW_CUTOFF)  # clamp extreme negatives
+                log_likelihoods[action] = max(logL, UNDERFLOW_CUTOFF)  
 
-        # Find max log-likelihood (log-sum-exp trick)
         max_log = max(log_likelihoods.values())
         prob_sum = 0.0
         probs = {}
 
-        # Convert back to probabilities
         for action, logL in log_likelihoods.items():
             if logL == LOG_ZERO:
                 probs[action] = 0.0
@@ -127,12 +120,10 @@ class Pool:
                 probs[action] = prob
                 prob_sum += prob
 
-        # Normalize result
         if prob_sum > 0:
             for action in probs:
                 probs[action] /= prob_sum
         else:
-            # If all collapsed numerically → return uniform over actions (or could fallback to zeros)
             n_actions = len(SOUND_ACTIONS)
             probs = {action: 1.0 / n_actions for action in SOUND_ACTIONS}
 
