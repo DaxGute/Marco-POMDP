@@ -60,7 +60,6 @@ class Pool:
     def __init__(self, pool_name: str):
         self.baseGrid = self.load_pool_csv(f"{POOLS_DIR}/{pool_name}")
         self.grid = copy.deepcopy(self.baseGrid)
-        self.time = 0
         
     def load_pool_csv(self, path):
         grid = []

@@ -6,16 +6,23 @@ class MarcoPoloPOMDP():
     def __init__(self, pool_name, num_polos, diagnostics = False):
         
         self.game = MarcoPolo(pool_name, num_polos, diagnostics)
-        self.num_branches = 2
-        self.depth = 2
+        self.depth = 3
+        self.num_branches = 3
 
     def hider_agnostic_clone(self, game):
-        game = copy.deepcopy(game)
-
+        game = copy.copy(game)
+        game.marco = copy.copy(game.marco)
+        
+        game.polos = [copy.copy(polo) for polo in game.polos]
+        
+        game.marco.lastActionRewardPairs = game.marco.lastActionRewardPairs.copy()
+        for polo in game.polos:
+            polo.lastActionRewardPairs = polo.lastActionRewardPairs.copy()
+        
+        game.marco.beliefGrids = [[row[:] for row in bg] for bg in game.marco.beliefGrids]
+        
         for idx, belief_grid in enumerate(game.marco.beliefGrids):
-            # Calculate centroid of the belief grid
             H, W = len(game.pool.baseGrid), len(game.pool.baseGrid[0])
-            
             coords = []
             weights = []
             
@@ -28,22 +35,35 @@ class MarcoPoloPOMDP():
             centroid_x = sum(weights[i] * coords[i][0] for i in range(len(coords))) 
             centroid_y = sum(weights[i] * coords[i][1] for i in range(len(coords))) 
             centroid = (int(centroid_x), int(centroid_y))
-
+            
             game.polos[idx].pos = centroid
-            game.polos[idx].beliefGrid = belief_grid
+            game.polos[idx].beliefGrid = [row[:] for row in belief_grid]
         
         return game
 
     def seeker_agnostic_clone(self, game):
-        game = copy.deepcopy(game)
-
+        game = copy.copy(game)
+        game.marco = copy.copy(game.marco)
+        
+        game.polos = [copy.copy(polo) for polo in game.polos]
+        
+        game.marco.lastActionRewardPairs = game.marco.lastActionRewardPairs.copy()
+        for polo in game.polos:
+            polo.lastActionRewardPairs = polo.lastActionRewardPairs.copy()
+        
         for i, polo in enumerate(game.polos):
-            game.marco.beliefGrids[i] = polo.beliefGrid
-
-        return game
+            game.polos[i].beliefGrid = [row[:] for row in polo.beliefGrid]
+        
+        game.marco.beliefGrids = [
+            [row[:] for row in polo.beliefGrid] 
+            for polo in game.polos
+        ]
             
+        return game
+                
 
     def get_best_marco_action_reward(self, game, depth):
+        num_branches = min(int(2**depth), self.num_branches)
         game.marco.choose_action()
 
         action_rewards = [(reward, action) for action, reward in game.marco.lastActionRewardPairs.items()]
@@ -55,70 +75,38 @@ class MarcoPoloPOMDP():
             return action_rewards[0][1], action_rewards[0][0]
 
         best_action, best_reward = None, float('-inf')
-        if game.rounds_since_yell >= 3:
-            for i in range(self.num_branches):
-                action = action_rewards[i][1]
-                
-                temp = self.hider_agnostic_clone(game)
-                if action == "yell":
-                    temp.rounds_since_yell = 0
-                else:
-                    temp.marco.pos = (temp.marco.pos[0] + action[0], temp.marco.pos[1] + action[1])
-
-                observations = []
-                for idx,polo in enumerate(temp.polos):
-                    action, reward = self.get_best_hider_action_reward(temp, idx, depth - 1)
-                    polo.pos = (polo.pos[0] + action[0], polo.pos[1] + action[1])
-                    sound = temp.pool.get_action_sound(polo.pos, action)
-
-                    dist = math.hypot(polo.pos[0] - temp.marco.pos[0], polo.pos[1] - temp.marco.pos[1])
-                    dist = max(dist, 1)
-
-                    observation = (sound.pos[0], sound.pos[1], sound.loudness / (dist * dist))
-                    observations.append(observation)
-
-                    polo.beliefGrid = polo.get_updated_belief_grid(polo.beliefGrid, observation)
-                
-                temp.marco.beliefGrids = temp.marco.get_updated_belief_grids(observations)
-
-                temp.rounds_since_yell += 1
-                temp.time += 1
-
-                _, reward = self.get_best_marco_action_reward(temp, depth - 1)
-
-                if reward > best_reward:
-                    best_action = action
-                    best_reward = reward
-
-        else:
-            best_action = (0, 0)
-
+        
+        for i in range(min(num_branches, len(action_rewards))):
+            marco_action = None
+            if game.rounds_since_yell < 3:
+                marco_action = (0, 0)
+            else:
+                marco_action = action_rewards[i][1]
+            
             temp = self.hider_agnostic_clone(game)
 
-            observations = []
-            for idx, polo in enumerate(temp.polos):
-                action, reward = self.get_best_hider_action_reward(temp, idx, depth - 1)
-                polo.pos = (polo.pos[0] + action[0], polo.pos[1] + action[1])
-                sound = temp.pool.get_action_sound(polo.pos, action)
-                
-                dist = math.hypot(polo.pos[0] - temp.marco.pos[0], polo.pos[1] - temp.marco.pos[1])
-                dist = max(dist, 1)
+            if marco_action == "yell":
+                temp.rounds_since_yell = 0
+            else:
+                temp.marco.pos = (temp.marco.pos[0] + marco_action[0], temp.marco.pos[1] + marco_action[1])
 
-                observation = (sound.pos[0], sound.pos[1], sound.loudness / (dist * dist))
-                observations.append(observation)
+            actions = []
+            for idx in range(len(temp.polos)):
+                action, _ = self.get_best_hider_action_reward(temp, idx, depth - 1)
+                actions.append(action)
 
-                polo.beliefGrid = polo.get_updated_belief_grid(polo.beliefGrid, observation)
-            
-            temp.marco.beliefGrids = temp.marco.get_updated_belief_grids(observations)
+            self.update_belief_on_polo_actions(temp, actions)
+       
+            _, reward = self.get_best_marco_action_reward(temp, depth - 1)
 
-            temp.rounds_since_yell += 1
-            temp.time += 1
-
-            _, best_reward = self.get_best_marco_action_reward(temp, depth - 1)
+            if reward > best_reward:
+                best_action = marco_action
+                best_reward = reward
 
         return best_action, best_reward
 
     def get_best_hider_action_reward(self, game, polo_idx, depth):
+        num_branches = min(int(2**depth), self.num_branches)
 
         game.polos[polo_idx].choose_action()
 
@@ -129,93 +117,45 @@ class MarcoPoloPOMDP():
             return action_rewards[0][1], action_rewards[0][0]
 
         best_action, best_reward = None, float('-inf')
-        if game.rounds_since_yell != 0:
-            for i in range(self.num_branches):
-                action = action_rewards[i][1]
-                temp = self.seeker_agnostic_clone(game)
-
-                temp.polos[i].pos = (temp.polos[i].pos[0] + action[0], temp.polos[i].pos[1] + action[1])
-                sound = game.pool.get_action_sound(temp.polos[i].pos, (action[0], action[1]))
-
-                dist = math.hypot(sound.pos[0] - temp.marco.pos[0], sound.pos[1] - temp.marco.pos[1])
-                dist = max(dist, 1)
-
-                observations = []
-                observation = (sound.pos[0], sound.pos[1], sound.loudness / (dist * dist))
-                observations.append(observation)
-
-                temp.polos[i].beliefGrid = temp.polos[i].get_updated_belief_grid(temp.polos[i].beliefGrid, observation)
-
-                for idx in range(len(temp.polos)):
-                    if idx != polo_idx:
-                        sound = temp.simulate_polo_action(temp.polos[idx])
-                        dist = math.hypot(temp.polos[idx].pos[0] - temp.marco.pos[0], temp.polos[idx].pos[1] - temp.marco.pos[1])
-                        dist = max(dist, 1)
-                        observation = (sound.pos[0], sound.pos[1], sound.loudness / (dist * dist))
-                        observations.append(observation)
-                        temp.polos[idx].beliefGrid = temp.polos[idx].get_updated_belief_grid(temp.polos[idx].beliefGrid, observation)
-
-                temp.marco.beliefGrids = temp.marco.get_updated_belief_grids(observations)
-
-                temp.rounds_since_yell += 1
-                temp.time += 1
-
-                marco_action, _ = self.get_best_marco_action_reward(temp, depth - 1)
-                if marco_action == "yell":
-                    temp.rounds_since_yell = 0
-                else:
-                    temp.marco.pos = (temp.marco.pos[0] + marco_action[0], temp.marco.pos[1] + marco_action[1])
-
-                _, reward = self.get_best_hider_action_reward(temp, polo_idx, depth - 1)
-
-                if reward > best_reward:
-                    best_action = action
-                    best_reward = reward
-            
-        else:
-            best_action = (0, 0)
+        
+        for i in range(min(num_branches, len(action_rewards))):
+            actions = []
+            if game.rounds_since_yell == 0:
+                actions = [(0, 0) for _ in range(len(game.polos))]
+            else:
+                for idx in range(len(game.polos)):
+                    if idx == polo_idx:
+                        actions.append(action_rewards[i][1])
+                    else:
+                        action, _ = self.get_best_hider_action_reward(game, idx, depth - 1)
+                        actions.append(action)
 
             temp = self.seeker_agnostic_clone(game)
-            sound = temp.pool.get_action_sound(temp.polos[polo_idx].pos, "yell")
 
-            dist = math.hypot(sound.pos[0] - temp.marco.pos[0], sound.pos[1] - temp.marco.pos[1])
-            dist = max(dist, 1)
+            self.update_belief_on_polo_actions(temp, actions)
 
-            observations = []
-            observation = (sound.pos[0], sound.pos[1], sound.loudness / (dist * dist))
-            observations.append(observation)
-
-            temp.polos[polo_idx].beliefGrid = temp.polos[polo_idx].get_updated_belief_grid(temp.polos[polo_idx].beliefGrid, observation)
-
-            for idx in range(len(temp.polos)):
-                if idx != polo_idx:
-                    sound = temp.pool.get_action_sound(temp.polos[idx].pos, "yell")
-                    dist = math.hypot(temp.polos[idx].pos[0] - temp.marco.pos[0], temp.polos[idx].pos[1] - temp.marco.pos[1])
-                    dist = max(dist, 1)
-                    observation = (sound.pos[0], sound.pos[1], sound.loudness / (dist * dist))
-                    observations.append(observation)
-                    temp.polos[idx].beliefGrid = temp.polos[idx].get_updated_belief_grid(temp.polos[idx].beliefGrid, observation)
-
-            temp.marco.beliefGrids = temp.marco.get_updated_belief_grids(observations)
-
-            temp.rounds_since_yell += 1
-            temp.time += 1
-
-            action, _ = self.get_best_marco_action_reward(temp, depth - 1)
-            if action == "yell":
+            marco_action, _ = self.get_best_marco_action_reward(temp, depth - 1)
+            if marco_action == "yell":
                 temp.rounds_since_yell = 0
             else:
-                temp.marco.pos = (temp.marco.pos[0] + action[0], temp.marco.pos[1] + action[1])
+                temp.marco.pos = (temp.marco.pos[0] + marco_action[0], temp.marco.pos[1] + marco_action[1])
 
-            _, best_reward = self.get_best_hider_action_reward(temp, polo_idx, depth - 1)
+            _, reward = self.get_best_hider_action_reward(temp, polo_idx, depth - 1)
+
+            if reward > best_reward:
+                best_action = actions[polo_idx]
+                best_reward = reward
 
         return best_action, best_reward
     
     def iterate_round(self):
-        self.game.pool.time += 1
 
-        best_action, _ = self.get_best_marco_action_reward(self.game, self.depth)
+        if self.game.rounds_since_yell < 3:
+            best_action = (0, 0)
+        else:
+            best_action, _ = self.get_best_marco_action_reward(self.game, self.depth)
         print("Marco action:", best_action)
+
         if best_action == "yell":
             self.game.rounds_since_yell = 0
         else:
@@ -224,37 +164,46 @@ class MarcoPoloPOMDP():
         if self.game.has_won():
             return True
 
-        observations = []
+        actions = []
         for i in range(len(self.game.polos)):
-            best_action, _ = self.get_best_hider_action_reward(self.game, i, self.depth)
-            print("Polo", i, "action:", best_action)
-            self.game.polos[i].pos = (self.game.polos[i].pos[0] + best_action[0], self.game.polos[i].pos[1] + best_action[1])
             if self.game.rounds_since_yell == 0:
-                sound = self.game.pool.get_action_sound(self.game.polos[i].pos, "yell")
+                best_action = (0, 0)
             else:
-                sound = self.game.pool.get_action_sound(self.game.polos[i].pos, (best_action[0], best_action[1]))
-
-
-            dist = math.hypot(self.game.polos[i].pos[0] - self.game.marco.pos[0], self.game.polos[i].pos[1] - self.game.marco.pos[1])
-            dist = max(dist, 1)
-
-            observation = (sound.pos[0], sound.pos[1], sound.loudness / (dist * dist))
-            self.game.polos[i].beliefGrid= self.game.polos[i].get_updated_belief_grid(self.game.polos[i].beliefGrid, observation)
-
-            (pos, loudness) = sound.observed_sound(self.game.marco.pos)
-
-            x = max(0, min(int(round(pos[0])), len(self.game.pool.grid)-1))
-            y = max(0, min(int(round(pos[1])), len(self.game.pool.grid[0])-1))
-
-            observations.append((x, y, loudness))
+                best_action, _ = self.get_best_hider_action_reward(self.game, i, self.depth)
             
-        self.game.marco.beliefGrids = self.game.marco.get_updated_belief_grids(observations)
-
-        self.game.rounds_since_yell += 1
-
-        self.game.time += 1
+            self.game.polos[i].pos = (self.game.polos[i].pos[0] + best_action[0], self.game.polos[i].pos[1] + best_action[1])
+            actions.append(best_action)
+            print("Polo", i, "action:", best_action)
+        
+        self.update_belief_on_polo_actions(self.game, actions)
 
         return False
+
+    @staticmethod
+    def update_belief_on_polo_actions(game, actions):
+        marco_observations = []
+        for i, action in enumerate(actions):
+            sound = game.pool.get_action_sound(game.polos[i].pos, (action[0], action[1])) 
+            if game.rounds_since_yell == 0:
+                sound = game.pool.get_action_sound(game.polos[i].pos, "yell")
+
+            dist = math.hypot(game.polos[i].pos[0] - game.marco.pos[0], game.polos[i].pos[1] - game.marco.pos[1])
+            dist = max(dist, 1)
+
+            polo_observation = (sound.pos[0], sound.pos[1], sound.loudness / (dist * dist))
+            game.polos[i].beliefGrid = game.polos[i].get_updated_belief_grid(game.polos[i].beliefGrid, polo_observation)
+
+            (pos, loudness) = sound.observed_sound(game.marco.pos)
+
+            x = max(0, min(int(round(pos[0])), len(game.pool.grid)-1))
+            y = max(0, min(int(round(pos[1])), len(game.pool.grid[0])-1))
+
+            marco_observations.append((x, y, loudness))
+        
+        game.marco.beliefGrids = game.marco.get_updated_belief_grids(marco_observations)
+
+        game.rounds_since_yell += 1
+        game.time += 1
 
     def render(self):
         self.game.render()

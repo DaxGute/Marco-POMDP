@@ -28,7 +28,6 @@ def main():
 
         i += 1
 
-        input("Press Enter to continue...")
     game.render()
 
     print("Game over!")
