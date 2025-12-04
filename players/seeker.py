@@ -16,7 +16,7 @@ class Seeker(Player):
         for i in range(num_polos):
             self.beliefGrids.append(self.initialize_belief_grid())
 
-
+        # 1e6 certainty for greedy
         self.l1 = 1e8   # certainty (now normalized to [0,1])
         self.l2 = 1e2   # distance
         self.l3 = 1e8   # capture
