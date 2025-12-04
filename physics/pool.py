@@ -2,6 +2,7 @@ import copy
 import csv
 import math
 from physics.sound import Sound, get_actual_sound_likelihood
+from functools import lru_cache
 
 POOLS_DIR = "pools"
 
@@ -92,7 +93,17 @@ class Pool:
         return Sound(pos, SOUND_ACTIONS[action])
 
 
-    def get_perceived_sound_actions_liklihoods(self, loudness):
+    def get_perceived_sound_actions_liklihoods(self, source_loudness):
+        source_loudness = max(source_loudness, 1e-10)
+        
+        discretized = round(math.log10(source_loudness), 2)
+        
+        return self.get_actions_liklihoods_cached(discretized)
+
+
+    @lru_cache(maxsize=1500)
+    def get_actions_liklihoods_cached(self, log_loudness):
+        loudness = max(10 ** log_loudness, 1e-10)
 
         LOG_ZERO = float('-inf')     
         UNDERFLOW_CUTOFF = -700     

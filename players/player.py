@@ -2,6 +2,7 @@ import copy
 import math
 from physics.pool import Pool
 from physics.sound import Sound, get_perceived_likelihood_grid
+import numpy as np
 
 SYMBOLS = {
     0: "▯",
@@ -74,8 +75,8 @@ class Player:
 
     
     def get_updated_belief_grid(self, beliefGrid, observation):
-        H = len(beliefGrid)
-        W = len(beliefGrid[0])
+        beliefGrid = np.array(beliefGrid)
+        (H, W) = beliefGrid.shape
 
         (px, py, loudness) = observation
 
@@ -92,54 +93,43 @@ class Player:
 
         for i in range(H):
             for j in range(W):
-                newBeliefGrid[i][j] *= L[i][j]**3
+                newBeliefGrid[i][j] *= L[i][j]
 
         newBeliefGrid[self.game.marco.pos[0]][self.game.marco.pos[1]] = 0
 
         return self.normalize_belief_grid(newBeliefGrid)
 
-    # def diffuse_sharp_belief_grid(self, beliefGrid):
-    #     max_likelihood = max(max(row) for row in beliefGrid)
-    #     if max_likelihood_at_peak > 0.8:  
-    #         beliefGrid_diffused = [[0.0 for _ in range(W)] for _ in range(H)]
-    #         for i in range(H):
-    #             for j in range(W):
-    #                 # Add neighboring cells
-    #                 for di in [-1, 0, 1]:
-    #                     for dj in [-1, 0, 1]:
-    #                         ni, nj = i + di, j + dj
-    #                         if 0 <= ni < H and 0 <= nj < W:
-    #                             L_diffused[i][j] += L[ni][nj] * 0.2  # Spread 20% to neighbors
-    #                 beli_diffused[i][j] += L[i][j] * 0.8  # Keep 80% at original
-    #     return newBeliefGrid
-
     def get_diffused_prior_belief_grid(self, beliefGrid, loudness):
-        newBeliefGrid = [[0.0 for _ in row] for row in beliefGrid]
-
-        for i in range(len(newBeliefGrid)):
-            for j in range(len(newBeliefGrid[0])):
-                if (i, j) == self.game.marco.pos:
+        beliefGrid = np.array(beliefGrid)
+        H, W = beliefGrid.shape
+        newBeliefGrid = np.zeros((H, W))
+        
+        marco_pos = self.game.marco.pos
+    
+        i_grid, j_grid = np.mgrid[0:H, 0:W]
+        
+        dist = np.hypot(i_grid - marco_pos[0], j_grid - marco_pos[1])
+        source_loudness = loudness * (dist * dist)
+        
+        for i in range(H):
+            for j in range(W):
+                if (i, j) == marco_pos or not self.pool.in_bounds(i, j):
                     continue
-                if  not self.pool.in_bounds(i,j):
-                    continue
-
-                dist = math.hypot(i - self.game.marco.pos[0], j - self.game.marco.pos[1])
-                source_loudness = loudness * (dist * dist)
-                actions_liklihoods = self.pool.get_perceived_sound_actions_liklihoods(source_loudness)
-
-
-                for action in actions_liklihoods:
-
+                
+                actions_liklihoods = self.pool.get_perceived_sound_actions_liklihoods(
+                    source_loudness[i, j]
+                )
+                
+                for action, likelihood in actions_liklihoods.items():
                     if action == "yell":
                         dx, dy = 0, 0
-                    else:   
+                    else:
                         dx, dy = action
-
-                    source_x = i - dx
-                    source_y = j - dy
+                    
+                    source_x, source_y = i - dx, j - dy
                     if self.pool.in_bounds(source_x, source_y):
-                        newBeliefGrid[i][j] += actions_liklihoods[action] * beliefGrid[source_x][source_y]
-
+                        newBeliefGrid[i, j] += likelihood * beliefGrid[source_x, source_y]
+        
         return self.normalize_belief_grid(newBeliefGrid)
 
     def doggalicious_display_belief_grid(self, beliefGrid):
