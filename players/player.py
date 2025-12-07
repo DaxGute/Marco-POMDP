@@ -13,33 +13,52 @@ SYMBOLS = {
 }
 
 class Player:
-    def __init__(self, x: int, y: int, pool: Pool):
+    def __init__(self, x: int, y: int, pool: Pool, game):
         self.pos = (x, y)
         self.pool = pool
-
+        self.game = game
+        
         self.lastActionRewardPairs = {}
 
-        self.beliefGrid = self.initialize_belief_grid()
+        # Defer belief grid initialization - it requires marco to exist
+        # It will be initialized by the game class after all players are created
+        self.beliefGrid = None
 
 
     def initialize_belief_grid(self):
-        totalWaterCells = 0
-        for i, row in enumerate(self.pool.grid):
-            for j, cell in enumerate(row):
-                if cell == 0 and (i, j):
-                    totalWaterCells += 1
+        H, W = len(self.game.pool.grid), len(self.game.pool.grid[0])
+        mx, my = self.game.marco.pos
 
-        beliefPrior = 1 / totalWaterCells 
+        distances = []
+        for i in range(H):
+            for j in range(W):
+                if self.pool.grid[i][j] == 0:
+                    d = math.hypot(i - mx, j - my)
+                    distances.append(d)
+
+        d_min = min(distances)
+        d_max = max(distances)
+        span = max(d_max - d_min, 1e-9)
 
         beliefGrid = []
-        for i in range(len(self.pool.grid)):
-            beliefGrid.append([])
-            for j in range(len(self.pool.grid[0])):
+        total = 0.0
+        for i in range(H):
+            row = []
+            for j in range(W):
                 if self.pool.grid[i][j] == 0:
-                    beliefGrid[i].append(beliefPrior)
+                    d = math.hypot(i - mx, j - my)
+                    val = (d - d_min) / span
+                    row.append(val)
+                    total += val
                 else:
-                    beliefGrid[i].append(0)
+                    row.append(0)
+            beliefGrid.append(row)
+        for i in range(H):
+            for j in range(W):
+                beliefGrid[i][j] /= total
+
         return beliefGrid
+
 
 
     def normalize_belief_grid(self, beliefGrid):

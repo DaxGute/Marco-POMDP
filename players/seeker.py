@@ -9,12 +9,8 @@ from physics.sound import get_perceived_likelihood_grid, Sound, get_actual_sound
 
 
 class Seeker(Player):
-    def __init__(self, x: int, y: int, pool: Pool, num_polos: int):
-        super().__init__(x, y, pool)
-
-        self.beliefGrids = []
-        for i in range(num_polos):
-            self.beliefGrids.append(self.initialize_belief_grid())
+    def __init__(self, x: int, y: int, pool: Pool, num_polos: int, game):
+        super().__init__(x, y, pool, game)
 
         # 1e6 certainty for greedy
         self.l1 = 1e8   # certainty (now normalized to [0,1])

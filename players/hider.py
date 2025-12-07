@@ -6,9 +6,8 @@ from physics.sound import get_perceived_likelihood_grid
 
 
 class Hider(Player):
-    def __init__(self, x: int, y: int, pool: Pool):
-        super().__init__(x, y, pool)
-        self.beliefGrid = self.initialize_belief_grid()
+    def __init__(self, x: int, y: int, pool: Pool, game):
+        super().__init__(x, y, pool, game)
 
         self.l1 = 1e4   # certainty
         self.l2 = 1e4   # distance

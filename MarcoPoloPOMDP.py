@@ -3,7 +3,7 @@ import copy
 import math
 
 class MarcoPoloPOMDP():
-    def __init__(self, pool_name, num_polos, diagnostics = False):
+    def __init__(self, pool_name, num_polos, diagnostics = False, locations = []):
         
         self.game = MarcoPolo(pool_name, num_polos, diagnostics)
         self.depth = 3
@@ -173,7 +173,7 @@ class MarcoPoloPOMDP():
             
             self.game.polos[i].pos = (self.game.polos[i].pos[0] + best_action[0], self.game.polos[i].pos[1] + best_action[1])
             actions.append(best_action)
-            print("Polo", i, "action:", best_action)
+            print("Polo", i+1, "action:", best_action)
         
         self.update_belief_on_polo_actions(self.game, actions)
 
