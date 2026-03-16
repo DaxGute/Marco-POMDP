@@ -41,6 +41,8 @@ The simulation now runs complete rounds. This establishes a fully functional tes
 
 Action selection is extended with a finite-horizon POMDP-style lookahead search that simulates possible future interactions between the seeker and the hiders. The planner recursively evaluates action sequences up to a fixed depth (currently depth = 3) while pruning the search tree by considering only the top-rewarded candidate actions at each step. At every node, the current game state is cloned into an “agnostic” hypothetical state, where hidden agents are replaced with point estimates derived from belief distributions (e.g., centroids of belief grids). This allows the planner to simulate outcomes without revealing true hidden positions.
 
+For a full explanation and demo, watch the video linked.
+
 ## Setup
 
 ```bash
